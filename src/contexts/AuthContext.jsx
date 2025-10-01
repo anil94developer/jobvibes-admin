@@ -35,33 +35,22 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Static credentials for demo
-      const VALID_EMAIL = "admin@dashboard.com";
-      const VALID_PASSWORD = "password123";
-
-      if (!email || !password) {
+      if (!email || !password)
         throw new Error("Email and password are required");
-      }
 
-      // Check against static credentials
-      if (email !== VALID_EMAIL || password !== VALID_PASSWORD) {
-        throw new Error("Invalid email or password");
-      }
+      const { authApi } = await import("../api/apiService");
+      const resp = await authApi.login(email, password);
 
-      // Successful authentication
-      const userData = {
-        id: 1,
-        email: email,
-        name: "Admin User",
-      };
+      if (!resp?.status) throw new Error(resp?.message || "Login failed");
 
-      const token = "demo-jwt-token-" + Date.now();
+      const { tokens, ...userInfo } = resp.data || {};
+      const accessToken = tokens?.accessToken || "";
 
-      // Store in localStorage
-      localStorage.setItem("authToken", token);
-      localStorage.setItem("userData", JSON.stringify(userData));
+      if (!accessToken) throw new Error("Invalid token response");
 
-      setUser(userData);
+      localStorage.setItem("authToken", accessToken);
+      localStorage.setItem("userData", JSON.stringify(userInfo));
+      setUser(userInfo);
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };

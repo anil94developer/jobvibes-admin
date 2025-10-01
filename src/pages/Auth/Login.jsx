@@ -29,27 +29,19 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  const handleChange = (e) =>
+    setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    // Basic validation
     if (!formData.email || !formData.password) {
       setError("Please fill in all fields");
       setLoading(false);
@@ -156,23 +148,8 @@ const Login = () => {
 
               <CardContent sx={{ p: 4 }}>
                 {/* Demo Credentials Info */}
-                <Alert
-                  severity="info"
-                  sx={{
-                    mb: 3,
-                    borderRadius: 2,
-                    "& .MuiAlert-message": {
-                      width: "100%",
-                    },
-                  }}
-                >
-                  <Typography variant="body2" fontWeight="bold" gutterBottom>
-                    Demo Credentials:
-                  </Typography>
-                  <Typography variant="body2">
-                    Email: admin@dashboard.com
-                  </Typography>
-                  <Typography variant="body2">Password: password123</Typography>
+                <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+                  Use your admin email and password to sign in
                 </Alert>
 
                 {error && (
@@ -299,11 +276,7 @@ const Login = () => {
                       <Typography
                         variant="body2"
                         color="primary"
-                        sx={{
-                          "&:hover": {
-                            textDecoration: "underline",
-                          },
-                        }}
+                        sx={{ "&:hover": { textDecoration: "underline" } }}
                       >
                         Forgot your password?
                       </Typography>

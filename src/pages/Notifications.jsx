@@ -134,16 +134,18 @@ const Notifications = () => {
     const loadNotifications = async () => {
       try {
         setLoading(true);
-        const response = await notificationApi.getNotifications();
-        if (response?.data) {
-          const notificationData = response.data.map((notification, index) => ({
+        const response = await notificationApi.getAll();
+        const list = response?.data?.notifications || response?.data || [];
+        if (list) {
+          const notificationData = list.map((notification, index) => ({
             ...fallbackNotifications[index % fallbackNotifications.length],
-            id: notification.id || index + 1,
+            id: notification.id || notification._id || index + 1,
             title:
               notification.title ||
               fallbackNotifications[index % fallbackNotifications.length].title,
             message:
               notification.message ||
+              notification.body ||
               fallbackNotifications[index % fallbackNotifications.length]
                 .message,
             read:

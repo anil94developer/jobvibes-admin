@@ -133,10 +133,10 @@ const Dashboard = () => {
           applicationsResponse,
           notificationsResponse,
         ] = await Promise.allSettled([
-          userApi.getAllUsers(),
-          jobApi.getAllJobs(),
-          applicationApi.getAllApplications(),
-          notificationApi.getNotifications(),
+          userApi.getAll(),
+          jobApi.getAll(),
+          applicationApi.getAll(),
+          notificationApi.getAll(),
         ]);
 
         // Process stats data
@@ -148,7 +148,8 @@ const Dashboard = () => {
         }
 
         if (jobsResponse.status === "fulfilled" && jobsResponse.value?.data) {
-          const jobsData = jobsResponse.value.data;
+          const jobsData =
+            jobsResponse.value.data?.results || jobsResponse.value.data;
           newStats[1].value = jobsData.length?.toString() || newStats[1].value;
         }
 
@@ -165,7 +166,9 @@ const Dashboard = () => {
           notificationsResponse.status === "fulfilled" &&
           notificationsResponse.value?.data
         ) {
-          const notificationsData = notificationsResponse.value.data;
+          const notificationsData =
+            notificationsResponse.value.data?.notifications ||
+            notificationsResponse.value.data;
           newStats[3].value =
             notificationsData.length?.toString() || newStats[3].value;
         }

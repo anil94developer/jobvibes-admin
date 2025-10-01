@@ -105,7 +105,8 @@ const Users = () => {
       try {
         setLoading(true);
         const response = await userApi.getAll();
-        setUsers(response?.data || response || []);
+        const rows = response?.data || [];
+        setUsers(rows.length ? rows : fallbackUsers);
       } catch (error) {
         console.log("API not available, using fallback data:", error);
         // Use fallback data when API is not available
@@ -137,7 +138,7 @@ const Users = () => {
       } else {
         // Try to fetch from API
         const response = await userApi.getById(userId);
-        setSelectedUser(response?.data || response);
+        setSelectedUser(response?.data || null);
         setViewDialogOpen(true);
       }
     } catch (error) {

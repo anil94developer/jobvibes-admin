@@ -152,15 +152,16 @@ const Resumes = () => {
     const loadResumes = async () => {
       try {
         setLoading(true);
-        const response = await userApi.getAllUsers();
-        if (response?.data) {
-          // Transform user data to resume format
-          const resumeData = response.data.map((user, index) => ({
+        const response = await userApi.getAll();
+        const rows = response?.data || [];
+        if (rows.length) {
+          // Transform users to resume cards
+          const resumeData = rows.map((user, index) => ({
             ...fallbackResumes[index % fallbackResumes.length],
-            id: user.id || index + 1,
+            id: user.id || user._id || index + 1,
             candidateName:
               user.name ||
-              user.username ||
+              user.user_name ||
               fallbackResumes[index % fallbackResumes.length].candidateName,
             email:
               user.email ||
