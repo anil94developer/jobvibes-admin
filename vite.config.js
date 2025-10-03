@@ -6,11 +6,11 @@ export default defineConfig({
   preview: {
     host: "0.0.0.0",
     port: 30002,
-    allowedHosts: ["*"], // 👈 allow ANY host
+    allowedHosts: "all", // 👈 allow ANY host
   },
   server: {
     host: "0.0.0.0",
     port: 30002,
-    allowedHosts: ["*"], // 👈 also for dev mode
+    allowedHosts: "all", // 👈 also for dev mode
   },
 });
