@@ -6,11 +6,11 @@ export default defineConfig({
   preview: {
     host: "0.0.0.0",
     port: 30002,
-    allowedHosts: "all", // 👈 allow ANY host
+    allowedHosts: "admin.jobvibes.in", // 👈 allow ANY host
   },
   server: {
     host: "0.0.0.0",
     port: 30002,
-    allowedHosts: "all", // 👈 also for dev mode
+    allowedHosts: "admin.jobvibes.in", // 👈 also for dev mode
   },
 });
