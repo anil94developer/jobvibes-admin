@@ -3,14 +3,23 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  preview: {
-    host: "0.0.0.0",
-    port: 30002,
-    allowedHosts: "admin.jobvibes.in", // 👈 allow ANY host
-  },
+
+  // Development server
   server: {
-    host: "0.0.0.0",
+    host: "admin.jobvibes.in", // your public host
     port: 30002,
-    allowedHosts: "admin.jobvibes.in", // 👈 also for dev mode
+    strictPort: false, // allows fallback if port is busy
+    hmr: {
+      host: "admin.jobvibes.in", // ensures HMR works externally
+    },
+    allowedHosts: ["admin.jobvibes.in"], // explicitly allow your host
+  },
+
+  // Preview server (vite preview)
+  preview: {
+    host: "admin.jobvibes.in",
+    port: 30002,
+    strictPort: false,
+    allowedHosts: ["admin.jobvibes.in"], // explicitly allow your host
   },
 });
