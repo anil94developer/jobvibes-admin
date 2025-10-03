@@ -4,20 +4,13 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: "0.0.0.0", // allow all IPs
-    port: 30002, // 👈 frontend runs on port 30002
-    allowedHosts: ["admin.jobvibes.in"], // allow your domain
-    proxy: {
-      "/api": {
-        target: "http://admin-api.jobvibes.in", // 👈 backend
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    host: "0.0.0.0",
+    port: 30002,
+    allowedHosts: ["admin.jobvibes.in"], // ✅ dev mode
   },
   preview: {
     host: "0.0.0.0",
     port: 30002,
-    allowedHosts: ["admin.jobvibes.in"],
+    allowedHosts: ["admin.jobvibes.in"], // ✅ preview mode (fixes Blocked request)
   },
 });
