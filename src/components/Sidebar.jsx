@@ -37,6 +37,11 @@ const menuItems = [
     path: "/users",
   },
   {
+    text: "State & City",
+    icon: <ArticleIcon />,
+    path: "/state-city",
+  },
+  {
     text: "Posts",
     icon: <ArticleIcon />,
     path: "/posts",

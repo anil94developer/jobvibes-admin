@@ -89,14 +89,14 @@ export const API_ENDPOINTS = {
     UPDATE_PREFERENCES: `${API_BASE_URL}/notifications/preferences`,
   },
 
-  // Dashboard Analytics APIs
-  ANALYTICS: {
-    GET_DASHBOARD_STATS: `${API_BASE_URL}/analytics/dashboard`,
-    GET_USER_STATS: `${API_BASE_URL}/analytics/users`,
-    GET_JOB_STATS: `${API_BASE_URL}/analytics/jobs`,
-    GET_APPLICATION_STATS: `${API_BASE_URL}/analytics/applications`,
-    GET_RECENT_ACTIVITIES: `${API_BASE_URL}/analytics/activities`,
-    GET_SYSTEM_HEALTH: `${API_BASE_URL}/analytics/system-health`,
+  // Dashboard Admin APIs
+  ADMIN: {
+    GET_DASHBOARD_STATS: `${API_BASE_URL}/v1/admin/dashboard`,
+    GET_USER_STATS: `${API_BASE_URL}/v1/admin/users`,
+    GET_JOB_STATS: `${API_BASE_URL}/v1/admin/jobs`,
+    GET_APPLICATION_STATS: `${API_BASE_URL}/v1/admin/applications`,
+    GET_RECENT_ACTIVITIES: `${API_BASE_URL}/v1/admin/activities`,
+    GET_SYSTEM_HEALTH: `${API_BASE_URL}/v1/admin/system-health`,
   },
 
   // Settings APIs

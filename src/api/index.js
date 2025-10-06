@@ -21,7 +21,7 @@ export {
   resumeApi,
   applicationApi,
   notificationApi,
-  analyticsApi,
+  adminApi,
   settingsApi,
 } from "./apiService";
 

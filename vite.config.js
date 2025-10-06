@@ -1,25 +1,31 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-// eslint-disable-next-line no-undef
-const host = process.env.VITE_HOST || "localhost";
-console.log("host", host);
+export default defineConfig(({ mode }) => {
+  // ✅ Properly load .env files based on current mode
+  const env = loadEnv(mode, process.cwd(), "");
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host,
-    port: 30002,
-    strictPort: true, // stop auto-incrementing
-    hmr: {
+  const host = env.VITE_HOST || "0.0.0.0"; // 0.0.0.0 allows LAN/server access
+  const port = Number(env.VITE_PORT) || 30002;
+
+  console.log(`Vite running on host: ${host}, port: ${port}`);
+
+  return {
+    plugins: [react()],
+    server: {
       host,
+      port,
+      strictPort: true,
+      allowedHosts: "all",
+      hmr: {
+        host: env.VITE_HMR_HOST || host,
+      },
     },
-    allowedHosts: "all",
-  },
-  preview: {
-    host,
-    port: 30002,
-    strictPort: true,
-    allowedHosts: "all", // ✅ allow all hosts explicitly
-  },
+    preview: {
+      host,
+      port,
+      strictPort: true,
+      allowedHosts: "all",
+    },
+  };
 });

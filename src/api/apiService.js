@@ -77,10 +77,23 @@ class ApiService {
   }
 
   /**
-   * GET request
+   * GET request (with query params support)
    */
   async get(url, options = {}) {
-    return this.request(url, { ...options, method: HTTP_METHODS.GET });
+    let finalUrl = url;
+
+    // Convert params object to query string
+    if (options.params && typeof options.params === "object") {
+      const queryString = new URLSearchParams(options.params).toString();
+      if (queryString) {
+        finalUrl += `?${queryString}`;
+      }
+    }
+
+    // Remove params from options to avoid passing it to fetch
+    const { ...restOptions } = options;
+
+    return this.request(finalUrl, { ...restOptions, method: HTTP_METHODS.GET });
   }
 
   /**
@@ -168,15 +181,25 @@ export const authApi = {
 
 // User services (View Only)
 export const userApi = {
-  getAll: () => apiService.get(API_ENDPOINTS.USERS.GET_ALL),
+  // Fetch all users with optional query parameters (search, page, limit)
+  getAll: ({ search = "", page = 1, limit = 10 } = {}) => {
+    console.log("------ ~ getAll params:------", { search, page, limit });
+    return apiService.get(API_ENDPOINTS.USERS.GET_ALL, {
+      params: { search, page, limit },
+    });
+  },
 
+  // Fetch a single user by ID
   getById: (id) => apiService.get(API_ENDPOINTS.USERS.GET_BY_ID(id)),
 
+  // Get logged-in user's profile
   getProfile: () => apiService.get(API_ENDPOINTS.USERS.GET_PROFILE),
 
+  // Update logged-in user's profile
   updateProfile: (profileData) =>
     apiService.put(API_ENDPOINTS.USERS.UPDATE_PROFILE, profileData),
 
+  // Upload user avatar
   uploadAvatar: (file) =>
     apiService.uploadFile(API_ENDPOINTS.USERS.UPLOAD_AVATAR, file),
 };
@@ -280,23 +303,22 @@ export const notificationApi = {
     apiService.post(API_ENDPOINTS.NOTIFICATIONS.CREATE, notificationData),
 };
 
-// Analytics services
-export const analyticsApi = {
+// Admin services
+export const adminApi = {
   getDashboardStats: () =>
-    apiService.get(API_ENDPOINTS.ANALYTICS.GET_DASHBOARD_STATS),
+    apiService.get(API_ENDPOINTS.ADMIN.GET_DASHBOARD_STATS),
 
-  getUserStats: () => apiService.get(API_ENDPOINTS.ANALYTICS.GET_USER_STATS),
+  getUserStats: () => apiService.get(API_ENDPOINTS.ADMIN.GET_USER_STATS),
 
-  getJobStats: () => apiService.get(API_ENDPOINTS.ANALYTICS.GET_JOB_STATS),
+  getJobStats: () => apiService.get(API_ENDPOINTS.ADMIN.GET_JOB_STATS),
 
   getApplicationStats: () =>
-    apiService.get(API_ENDPOINTS.ANALYTICS.GET_APPLICATION_STATS),
+    apiService.get(API_ENDPOINTS.ADMIN.GET_APPLICATION_STATS),
 
   getRecentActivities: () =>
-    apiService.get(API_ENDPOINTS.ANALYTICS.GET_RECENT_ACTIVITIES),
+    apiService.get(API_ENDPOINTS.ADMIN.GET_RECENT_ACTIVITIES),
 
-  getSystemHealth: () =>
-    apiService.get(API_ENDPOINTS.ANALYTICS.GET_SYSTEM_HEALTH),
+  getSystemHealth: () => apiService.get(API_ENDPOINTS.ADMIN.GET_SYSTEM_HEALTH),
 };
 
 // Settings services

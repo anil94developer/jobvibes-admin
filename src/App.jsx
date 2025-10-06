@@ -32,6 +32,7 @@ const Resumes = lazy(() => import("./pages/Resumes"));
 const Matches = lazy(() => import("./pages/Matches"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Settings = lazy(() => import("./pages/Settings"));
+const StateCity = lazy(() => import("./pages/StateCity"));
 
 // Loading component
 const LoadingFallback = () => (
@@ -69,6 +70,7 @@ function App() {
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="users" element={<Users />} />
+                <Route path="state-city" element={<StateCity />} />
                 <Route path="posts" element={<Posts />} />
                 <Route path="resumes" element={<Resumes />} />
                 <Route path="matches" element={<Matches />} />

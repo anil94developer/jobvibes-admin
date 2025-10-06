@@ -5,7 +5,20 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default [
+  // Ignore dist folder
   { ignores: ["dist"] },
+
+  // ✅ Node environment for config/build scripts
+  {
+    files: ["vite.config.js", "vite.config.mjs", "eslint.config.js"],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: "module",
+      ecmaVersion: "latest",
+    },
+  },
+
+  // ✅ React + browser rules
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
@@ -17,7 +30,9 @@ export default [
         sourceType: "module",
       },
     },
-    settings: { react: { version: "18.2" } },
+    settings: {
+      react: { version: "18.2" },
+    },
     plugins: {
       react,
       "react-hooks": reactHooks,
