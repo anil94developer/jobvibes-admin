@@ -13,10 +13,10 @@ import {
 import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
-  Article as ArticleIcon,
-  Description as DescriptionIcon,
-  ConnectWithoutContact as MatchesIcon,
-  Notifications as NotificationsIcon,
+  // Article as ArticleIcon,
+  // Description as DescriptionIcon,
+  // ConnectWithoutContact as MatchesIcon,
+  // Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
 } from "@mui/icons-material";
@@ -36,31 +36,31 @@ const menuItems = [
     icon: <PeopleIcon />,
     path: "/users",
   },
-  {
-    text: "State & City",
-    icon: <ArticleIcon />,
-    path: "/state-city",
-  },
-  {
-    text: "Posts",
-    icon: <ArticleIcon />,
-    path: "/posts",
-  },
-  {
-    text: "Resumes",
-    icon: <DescriptionIcon />,
-    path: "/resumes",
-  },
-  {
-    text: "Matches",
-    icon: <MatchesIcon />,
-    path: "/matches",
-  },
-  {
-    text: "Notifications",
-    icon: <NotificationsIcon />,
-    path: "/notifications",
-  },
+  // {
+  //   text: "State & City",
+  //   icon: <ArticleIcon />,
+  //   path: "/state-city",
+  // },
+  // {
+  //   text: "Posts",
+  //   icon: <ArticleIcon />,
+  //   path: "/posts",
+  // },
+  // {
+  //   text: "Resumes",
+  //   icon: <DescriptionIcon />,
+  //   path: "/resumes",
+  // },
+  // {
+  //   text: "Matches",
+  //   icon: <MatchesIcon />,
+  //   path: "/matches",
+  // },
+  // {
+  //   text: "Notifications",
+  //   icon: <NotificationsIcon />,
+  //   path: "/notifications",
+  // },
   {
     text: "Settings",
     icon: <SettingsIcon />,
