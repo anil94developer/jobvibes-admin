@@ -23,6 +23,7 @@ export {
   notificationApi,
   adminApi,
   settingsApi,
+  stateCityApi,
 } from "./apiService";
 
 /**

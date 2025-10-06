@@ -343,4 +343,11 @@ export const settingsApi = {
     apiService.get(API_ENDPOINTS.SETTINGS.GET_SECURITY_LOGS),
 };
 
+// Export API service module
+export const stateCityApi = {
+  getStates: () => apiService.get(API_ENDPOINTS.STATE_CITY.GET_STATES),
+  getCities: (state) =>
+    apiService.get(API_ENDPOINTS.STATE_CITY.GET_CITIES(state)),
+};
+
 export default apiService;
