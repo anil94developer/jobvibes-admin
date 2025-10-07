@@ -36,17 +36,19 @@ export const API_ENDPOINTS = {
 
   // Job Posts APIs
   JOBS: {
-    GET_ALL: `${API_BASE_URL}/jobs`,
-    GET_BY_ID: (id) => `${API_BASE_URL}/jobs/${id}`,
-    CREATE: `${API_BASE_URL}/jobs`,
-    UPDATE: (id) => `${API_BASE_URL}/jobs/${id}`,
-    DELETE: (id) => `${API_BASE_URL}/jobs/${id}`,
-    PUBLISH: (id) => `${API_BASE_URL}/jobs/${id}/publish`,
-    UNPUBLISH: (id) => `${API_BASE_URL}/jobs/${id}/unpublish`,
-    UPLOAD_VIDEO: (id) => `${API_BASE_URL}/jobs/${id}/video`,
-    GET_ACTIVE: `${API_BASE_URL}/jobs/active`,
-    GET_DRAFT: `${API_BASE_URL}/jobs/draft`,
-    SEARCH: `${API_BASE_URL}/jobs/search`,
+    GET_ALL: `${API_BASE_URL}/feeds`,
+    ACCEPT: (id) => `${API_BASE_URL}/feeds/${id}/accept`,
+    REJECT: (id) => `${API_BASE_URL}/feeds/${id}/reject`,
+    GET_BY_ID: (id) => `${API_BASE_URL}/feeds/${id}`,
+    CREATE: `${API_BASE_URL}/feeds`,
+    UPDATE: (id) => `${API_BASE_URL}/feeds/${id}`,
+    DELETE: (id) => `${API_BASE_URL}/feeds/${id}`,
+    PUBLISH: (id) => `${API_BASE_URL}/feeds/${id}/publish`,
+    UNPUBLISH: (id) => `${API_BASE_URL}/feeds/${id}/unpublish`,
+    UPLOAD_VIDEO: (id) => `${API_BASE_URL}/feeds/${id}/video`,
+    GET_ACTIVE: `${API_BASE_URL}/feeds/active`,
+    GET_DRAFT: `${API_BASE_URL}/feeds/draft`,
+    SEARCH: `${API_BASE_URL}/feeds/search`,
   },
 
   // Resumes/Profiles APIs

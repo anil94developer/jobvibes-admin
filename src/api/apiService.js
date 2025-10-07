@@ -205,10 +205,14 @@ export const userApi = {
 };
 
 // Job services
-export const jobApi = {
+export const feedApi = {
   getAll: () => apiService.get(API_ENDPOINTS.JOBS.GET_ALL),
 
   getById: (id) => apiService.get(API_ENDPOINTS.JOBS.GET_BY_ID(id)),
+
+  accept: (id) => apiService.put(API_ENDPOINTS.JOBS.ACCEPT(id)),
+
+  reject: (id) => apiService.put(API_ENDPOINTS.JOBS.REJECT(id)),
 
   create: (jobData) => apiService.post(API_ENDPOINTS.JOBS.CREATE, jobData),
 

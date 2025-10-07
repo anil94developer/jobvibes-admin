@@ -19,6 +19,7 @@ import {
   // Notifications as NotificationsIcon,
   Settings as SettingsIcon,
   Logout as LogoutIcon,
+  Feed,
 } from "@mui/icons-material";
 import { colors, componentTokens } from "../theme";
 import { useAuth } from "../contexts/AuthContext";
@@ -35,6 +36,11 @@ const menuItems = [
     text: "Users",
     icon: <PeopleIcon />,
     path: "/users",
+  },
+  {
+    text: "Posts",
+    icon: <Feed />,
+    path: "/posts",
   },
   // {
   //   text: "State & City",

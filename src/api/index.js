@@ -17,7 +17,7 @@ export {
   default as apiService,
   authApi,
   userApi,
-  jobApi,
+  feedApi,
   resumeApi,
   applicationApi,
   notificationApi,
