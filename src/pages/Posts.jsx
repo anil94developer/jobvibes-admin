@@ -614,19 +614,6 @@ const Posts = () => {
     }
   };
 
-  const getVideoStatusColor = (videoStatus) => {
-    switch (videoStatus) {
-      case "approved":
-        return "success";
-      case "rejected":
-        return "error";
-      case "pending":
-        return "warning";
-      default:
-        return "default";
-    }
-  };
-
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: "background.default" }}>
       <Box
@@ -1089,22 +1076,6 @@ const Posts = () => {
                     }}
                     allow="autoplay; encrypted-media"
                     allowFullScreen
-                  />
-                  <Chip
-                    label={`Video: ${
-                      selectedJob.videoStatus
-                        ? selectedJob.videoStatus.charAt(0).toUpperCase() +
-                          selectedJob.videoStatus.slice(1)
-                        : "Unknown"
-                    }`}
-                    color={getVideoStatusColor(selectedJob.videoStatus)}
-                    size="small"
-                    sx={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                      bgcolor: "rgba(255, 255, 255, 0.9)",
-                    }}
                   />
                 </Box>
               ) : (

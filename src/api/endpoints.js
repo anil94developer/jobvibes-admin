@@ -34,20 +34,46 @@ export const API_ENDPOINTS = {
     GET_RECRUITERS: `${API_BASE_URL}/users/recruiters`,
   },
 
-  // Job Posts APIs
+  // Job Posts APIs (Feeds)
+  // Endpoints for managing job posts/feeds
   JOBS: {
+    // Get all job posts (supports pagination: page, limit, status)
     GET_ALL: `${API_BASE_URL}/feeds`,
+
+    // Accept/approve a job post
     ACCEPT: (id) => `${API_BASE_URL}/feeds/${id}/accept`,
+
+    // Reject a job post
     REJECT: (id) => `${API_BASE_URL}/feeds/${id}/reject`,
+
+    // Get a specific job post by ID
     GET_BY_ID: (id) => `${API_BASE_URL}/feeds/${id}`,
+
+    // Create a new job post
     CREATE: `${API_BASE_URL}/feeds`,
+
+    // Update a job post
     UPDATE: (id) => `${API_BASE_URL}/feeds/${id}`,
+
+    // Delete a job post
     DELETE: (id) => `${API_BASE_URL}/feeds/${id}`,
+
+    // Publish a job post
     PUBLISH: (id) => `${API_BASE_URL}/feeds/${id}/publish`,
+
+    // Unpublish a job post
     UNPUBLISH: (id) => `${API_BASE_URL}/feeds/${id}/unpublish`,
+
+    // Upload video for a job post
     UPLOAD_VIDEO: (id) => `${API_BASE_URL}/feeds/${id}/video`,
+
+    // Get active job posts
     GET_ACTIVE: `${API_BASE_URL}/feeds/active`,
+
+    // Get draft job posts
     GET_DRAFT: `${API_BASE_URL}/feeds/draft`,
+
+    // Search job posts
     SEARCH: `${API_BASE_URL}/feeds/search`,
   },
 
@@ -66,15 +92,34 @@ export const API_ENDPOINTS = {
   },
 
   // Job Applications & Matches APIs
+  // Endpoints for managing job applications and viewing candidate matches
   APPLICATIONS: {
+    // Get all applications (supports pagination: page, limit, search, status)
     GET_ALL: `${API_BASE_URL}/applications`,
+
+    // Get a specific application by ID
     GET_BY_ID: (id) => `${API_BASE_URL}/applications/${id}`,
+
+    // Create a new job application
     CREATE: `${API_BASE_URL}/applications`,
+
+    // Update application status (supports status: applied, under_review, shortlisted, interview_scheduled, hired, rejected)
     UPDATE_STATUS: (id) => `${API_BASE_URL}/applications/${id}/status`,
+
+    // Get all applications for a specific job
     GET_BY_JOB: (jobId) => `${API_BASE_URL}/applications/job/${jobId}`,
+
+    // Get all applications by a specific user/candidate
     GET_BY_USER: (userId) => `${API_BASE_URL}/applications/user/${userId}`,
+
+    // Schedule an interview for an application (POST with interview data: date, notes)
     SCHEDULE_INTERVIEW: (id) => `${API_BASE_URL}/applications/${id}/interview`,
+
+    // Get matches - list of candidates who applied for jobs (supports pagination: page, limit, search, status)
+    // Returns applications with populated user (candidate) and feed (job) data
     GET_MATCHES: `${API_BASE_URL}/applications/matches`,
+
+    // Calculate match score for a specific application
     CALCULATE_MATCH_SCORE: (applicationId) =>
       `${API_BASE_URL}/applications/${applicationId}/match-score`,
   },

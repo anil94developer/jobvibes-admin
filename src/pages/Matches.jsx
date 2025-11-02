@@ -12,7 +12,6 @@ import {
   Chip,
   Avatar,
   IconButton,
-  LinearProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -28,10 +27,10 @@ import {
   Select,
   FormControl,
   InputLabel,
+  Pagination,
 } from "@mui/material";
 import {
   Visibility as ViewIcon,
-  Message as MessageIcon,
   Schedule as ScheduleIcon,
   Close as CloseIcon,
   FilterList as FilterIcon,
@@ -39,136 +38,191 @@ import {
 } from "@mui/icons-material";
 import { applicationApi } from "../api";
 
-// Fallback data for candidate applications
-const fallbackMatches = [
-  {
-    id: 1,
-    candidateName: "Alice Johnson",
-    jobTitle: "Senior React Developer",
-    company: "Tech Solutions Inc.",
-    appliedDate: "2024-02-15",
-    status: "Under Review",
-    matchScore: 85,
-    interviewScheduled: false,
-    candidateEmail: "alice.johnson@example.com",
-    experience: "3 years",
-    skills: ["React", "JavaScript", "CSS"],
-  },
-  {
-    id: 2,
-    candidateName: "Bob Wilson",
-    jobTitle: "Backend Developer",
-    company: "DevCorp Ltd.",
-    appliedDate: "2024-02-14",
-    status: "Interview Scheduled",
-    matchScore: 92,
-    interviewScheduled: true,
-    candidateEmail: "bob.wilson@example.com",
-    experience: "5 years",
-    skills: ["Node.js", "Python", "MongoDB"],
-  },
-  {
-    id: 3,
-    candidateName: "Carol Martinez",
-    jobTitle: "Full Stack Developer",
-    company: "Innovation Corp.",
-    appliedDate: "2024-02-13",
-    status: "Shortlisted",
-    matchScore: 78,
-    interviewScheduled: false,
-    candidateEmail: "carol.martinez@example.com",
-    experience: "4 years",
-    skills: ["React", "Node.js", "PostgreSQL"],
-  },
-  {
-    id: 4,
-    candidateName: "David Brown",
-    jobTitle: "Data Analyst",
-    company: "Analytics Pro",
-    appliedDate: "2024-02-12",
-    status: "Rejected",
-    matchScore: 65,
-    interviewScheduled: false,
-    candidateEmail: "david.brown@example.com",
-    experience: "2 years",
-    skills: ["Python", "SQL", "Tableau"],
-  },
-  {
-    id: 5,
-    candidateName: "Eva Davis",
-    jobTitle: "UX Designer",
-    company: "Creative Agency Ltd.",
-    appliedDate: "2024-02-11",
-    status: "Hired",
-    matchScore: 94,
-    interviewScheduled: false,
-    candidateEmail: "eva.davis@example.com",
-    experience: "6 years",
-    skills: ["Figma", "Sketch", "Adobe XD"],
-  },
-  {
-    id: 6,
-    candidateName: "Frank Miller",
-    jobTitle: "DevOps Engineer",
-    company: "Cloud Systems Inc.",
-    appliedDate: "2024-02-10",
-    status: "Under Review",
-    matchScore: 88,
-    interviewScheduled: false,
-    candidateEmail: "frank.miller@example.com",
-    experience: "7 years",
-    skills: ["AWS", "Docker", "Kubernetes"],
-  },
-];
-
 const Matches = () => {
   // State management
-  const [matches, setMatches] = useState(fallbackMatches);
-  const [filteredMatches, setFilteredMatches] = useState(fallbackMatches);
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
-  const [messageText, setMessageText] = useState("");
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "info",
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalMatches, setTotalMatches] = useState(0);
+  const matchesPerPage = 10;
 
-  // Load matches data
+  // Debounce search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Load matches data from API
   useEffect(() => {
     const loadMatches = async () => {
       try {
         setLoading(true);
-        const response = await applicationApi.getAllApplications();
-        if (response?.data) {
-          // Transform application data to match format
-          const matchData = response.data.map((app, index) => ({
-            ...fallbackMatches[index % fallbackMatches.length],
-            id: app.id || index + 1,
-            candidateName:
-              app.candidateName ||
-              fallbackMatches[index % fallbackMatches.length].candidateName,
-            jobTitle:
-              app.jobTitle ||
-              fallbackMatches[index % fallbackMatches.length].jobTitle,
-            status:
-              app.status ||
-              fallbackMatches[index % fallbackMatches.length].status,
-          }));
-          setMatches(matchData);
-          setFilteredMatches(matchData);
+        const params = {
+          page: currentPage,
+          limit: matchesPerPage,
+        };
+
+        // Add search parameter if provided
+        if (debouncedSearchTerm.trim()) {
+          params.search = debouncedSearchTerm.trim();
         }
+
+        // Add status filter if not "All"
+        if (statusFilter !== "All") {
+          params.status = statusFilter.toLowerCase();
+        }
+
+        // Use the matches endpoint specifically for candidates who applied for jobs
+        const response = await applicationApi.getMatches(params);
+        const data = response?.data?.results || response?.data || [];
+        const pagination = response?.data?.pagination || {};
+
+        // Transform API data to match format
+        // Applications contain: userId (candidate), feedId (job), status, etc.
+        const matchData = data.map((app) => {
+          // Handle different possible structures from the API
+          const candidate = app.user || app.userId || app.candidate || {};
+          const job = app.feed || app.feedId || app.job || {};
+
+          // Extract job title - handle array format
+          const jobTitle = job.job_title
+            ? Array.isArray(job.job_title)
+              ? job.job_title[0]
+              : job.job_title
+            : job.title || "Unknown Position";
+
+          return {
+            id: app._id || app.id,
+            candidateName:
+              candidate.name ||
+              candidate.fullName ||
+              candidate.username ||
+              app.candidateName ||
+              "Unknown Candidate",
+            candidateEmail: candidate.email || app.candidateEmail || "",
+            profileImage:
+              candidate.profile_image ||
+              candidate.profileImage ||
+              app.profile_image ||
+              app.profileImage ||
+              null,
+            jobTitle: jobTitle,
+            company:
+              job.company ||
+              job.work_place_name ||
+              (Array.isArray(job.work_place_name)
+                ? job.work_place_name[0]
+                : job.work_place_name) ||
+              "Unknown Company",
+            appliedDate: app.createdAt
+              ? new Date(app.createdAt).toLocaleDateString()
+              : app.appliedDate
+              ? new Date(app.appliedDate).toLocaleDateString()
+              : "N/A",
+            status: app.status || (app.is_applied ? "Applied" : "Under Review"),
+            interviewScheduled:
+              app.interviewScheduled ||
+              app.interview_scheduled ||
+              app.status === "Interview Scheduled" ||
+              app.status === "interview_scheduled",
+            experience: (() => {
+              const exp = candidate.experience || app.experience;
+              if (!exp) return "N/A";
+              // Handle if experience is an object
+              if (typeof exp === "object" && exp !== null) {
+                // Handle array of experience objects
+                if (Array.isArray(exp) && exp.length > 0) {
+                  return exp
+                    .map((e) => {
+                      if (typeof e === "object" && e !== null) {
+                        const duration = e.duration || e.years || "";
+                        const company = e.company_name || "";
+                        return company && duration
+                          ? `${company} (${duration} years)`
+                          : duration
+                          ? `${duration} years`
+                          : company || "N/A";
+                      }
+                      return String(e);
+                    })
+                    .join(", ");
+                }
+                // Single experience object
+                const duration = exp.duration || exp.years || "";
+                const company = exp.company_name || "";
+                const ctc = exp.ctc ? ` - ${exp.ctc}` : "";
+                if (company && duration) {
+                  return `${company} (${duration} years)${ctc}`;
+                }
+                if (duration) {
+                  return `${duration} years${ctc}`;
+                }
+                if (company) {
+                  return company;
+                }
+                return "N/A";
+              }
+              return String(exp);
+            })(),
+            resume: app.resume || candidate.resume,
+            coverLetter: app.coverLetter || app.cover_letter || app.message,
+            // Internal IDs (not displayed)
+            jobId: job._id || app.feedId || app.jobId,
+            candidateId: candidate._id || app.userId || app.candidateId,
+            applicationId: app._id || app.id,
+            // Job post details
+            jobContent: job.content,
+            jobType: Array.isArray(job.job_type)
+              ? job.job_type[0]
+              : job.job_type,
+            workPlaceName: Array.isArray(job.work_place_name)
+              ? job.work_place_name[0]
+              : job.work_place_name,
+            jobCities: Array.isArray(job.cities)
+              ? job.cities
+              : job.cities
+              ? [job.cities]
+              : [],
+            jobStates: Array.isArray(job.states)
+              ? job.states
+              : job.states
+              ? [job.states]
+              : [],
+            noticePeriod: job.notice_period,
+            isImmediateJoiner: job.is_immediate_joiner,
+            jobMedia: job.media || [],
+          };
+        });
+
+        setMatches(matchData);
+        setTotalPages(pagination.totalPages || 1);
+        setTotalMatches(pagination.total || matchData.length);
       } catch (error) {
         console.error("Error loading matches:", error);
+        setMatches([]);
         setSnackbar({
           open: true,
-          message: "Using offline data - some information may not be current",
-          severity: "warning",
+          message: `Failed to load matches: ${
+            error.message || "Unknown error"
+          }`,
+          severity: "error",
         });
       } finally {
         setLoading(false);
@@ -176,62 +230,154 @@ const Matches = () => {
     };
 
     loadMatches();
-  }, []);
-
-  // Filter functionality
-  useEffect(() => {
-    let filtered = matches;
-
-    if (searchTerm.trim()) {
-      filtered = filtered.filter(
-        (match) =>
-          match.candidateName
-            .toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          match.jobTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          match.company.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== "All") {
-      filtered = filtered.filter((match) => match.status === statusFilter);
-    }
-
-    setFilteredMatches(filtered);
-  }, [searchTerm, statusFilter, matches]);
+  }, [currentPage, debouncedSearchTerm, statusFilter]);
 
   const getStatusColor = (status) => {
-    switch (status) {
-      case "Hired":
+    switch (status?.toLowerCase()) {
+      case "hired":
         return "success";
-      case "Interview Scheduled":
+      case "interview scheduled":
+      case "interview_scheduled":
         return "info";
-      case "Shortlisted":
+      case "shortlisted":
         return "primary";
-      case "Under Review":
+      case "applied":
+      case "under review":
         return "warning";
-      case "Rejected":
+      case "rejected":
         return "error";
       default:
         return "default";
     }
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 90) return "success";
-    if (score >= 75) return "info";
-    if (score >= 60) return "warning";
-    return "error";
-  };
+  const handleViewMatch = async (match) => {
+    // Fetch detailed match data if needed
+    // Use applicationId if available, otherwise use id
+    const appId = match.applicationId || match.id;
 
-  const handleViewMatch = (match) => {
-    setSelectedMatch(match);
+    if (appId) {
+      try {
+        const response = await applicationApi.getById(appId);
+        const app = response?.data || response;
+
+        // Handle different API response structures
+        const candidate = app.user || app.userId || app.candidate || {};
+        const job = app.feed || app.feedId || app.job || {};
+
+        const detailedMatch = {
+          ...match,
+          candidateName:
+            candidate.name ||
+            candidate.fullName ||
+            candidate.username ||
+            app.candidateName ||
+            match.candidateName,
+          candidateEmail:
+            candidate.email || app.candidateEmail || match.candidateEmail,
+          profileImage:
+            candidate.profile_image ||
+            candidate.profileImage ||
+            app.profile_image ||
+            app.profileImage ||
+            match.profileImage ||
+            null,
+          experience: (() => {
+            const exp =
+              candidate.experience || app.experience || match.experience;
+            if (!exp) return "N/A";
+            // Handle if experience is an object
+            if (typeof exp === "object" && exp !== null) {
+              // Handle array of experience objects
+              if (Array.isArray(exp) && exp.length > 0) {
+                return exp
+                  .map((e) => {
+                    if (typeof e === "object" && e !== null) {
+                      const duration = e.duration || e.years || "";
+                      const company = e.company_name || "";
+                      const ctc = e.ctc ? ` - ${e.ctc}` : "";
+                      return company && duration
+                        ? `${company} (${duration} years)${ctc}`
+                        : duration
+                        ? `${duration} years${ctc}`
+                        : company || "N/A";
+                    }
+                    return String(e);
+                  })
+                  .join(", ");
+              }
+              // Single experience object
+              const duration = exp.duration || exp.years || "";
+              const company = exp.company_name || "";
+              const ctc = exp.ctc ? ` - ${exp.ctc}` : "";
+              if (company && duration) {
+                return `${company} (${duration} years)${ctc}`;
+              }
+              if (duration) {
+                return `${duration} years${ctc}`;
+              }
+              if (company) {
+                return company;
+              }
+              return "N/A";
+            }
+            return String(exp);
+          })(),
+          resume: app.resume || candidate.resume || match.resume,
+          coverLetter:
+            app.coverLetter ||
+            app.cover_letter ||
+            app.message ||
+            match.coverLetter,
+          status: app.status || match.status,
+          jobTitle: job.job_title
+            ? Array.isArray(job.job_title)
+              ? job.job_title[0]
+              : job.job_title
+            : job.title || match.jobTitle,
+          company:
+            job.company ||
+            (Array.isArray(job.work_place_name)
+              ? job.work_place_name[0]
+              : job.work_place_name) ||
+            match.company,
+          // Job post details
+          jobContent: job.content || match.jobContent,
+          jobType: Array.isArray(job.job_type)
+            ? job.job_type[0]
+            : job.job_type || match.jobType,
+          workPlaceName: Array.isArray(job.work_place_name)
+            ? job.work_place_name[0]
+            : job.work_place_name || match.workPlaceName,
+          jobCities: Array.isArray(job.cities)
+            ? job.cities
+            : job.cities
+            ? [job.cities]
+            : match.jobCities || [],
+          jobStates: Array.isArray(job.states)
+            ? job.states
+            : job.states
+            ? [job.states]
+            : match.jobStates || [],
+          noticePeriod:
+            job.notice_period !== undefined
+              ? job.notice_period
+              : match.noticePeriod,
+          isImmediateJoiner:
+            job.is_immediate_joiner !== undefined
+              ? job.is_immediate_joiner
+              : match.isImmediateJoiner,
+          jobMedia: job.media || match.jobMedia || [],
+        };
+        setSelectedMatch(detailedMatch);
+      } catch (error) {
+        console.error("Error fetching match details:", error);
+        setSelectedMatch(match); // Use existing data if fetch fails
+      }
+    } else {
+      setSelectedMatch(match);
+    }
     setViewDialogOpen(true);
-  };
-
-  const handleSendMessage = (match) => {
-    setSelectedMatch(match);
-    setMessageDialogOpen(true);
   };
 
   const handleScheduleInterview = (match) => {
@@ -239,39 +385,56 @@ const Matches = () => {
     setScheduleDialogOpen(true);
   };
 
-  const handleSendMessageConfirm = () => {
-    setSnackbar({
-      open: true,
-      message: `Message sent to ${selectedMatch?.candidateName}`,
-      severity: "success",
-    });
-    setMessageDialogOpen(false);
-    setMessageText("");
-  };
+  const handleScheduleConfirm = async () => {
+    // Use applicationId if available, otherwise use id
+    const appId = selectedMatch?.applicationId || selectedMatch?.id;
+    if (!appId) return;
 
-  const handleScheduleConfirm = () => {
-    // Update the match status
-    const updatedMatches = matches.map((match) =>
-      match.id === selectedMatch.id
-        ? { ...match, status: "Interview Scheduled", interviewScheduled: true }
-        : match
-    );
-    setMatches(updatedMatches);
+    try {
+      const interviewData = {
+        date: new Date().toISOString(), // You can add a date picker later
+        notes: "",
+      };
 
-    setSnackbar({
-      open: true,
-      message: `Interview scheduled with ${selectedMatch?.candidateName}`,
-      severity: "success",
-    });
-    setScheduleDialogOpen(false);
+      await applicationApi.scheduleInterview(appId, interviewData);
+
+      // Update local state optimistically
+      setMatches((prev) =>
+        prev.map((match) => {
+          const matchAppId = match.applicationId || match.id;
+          const selectedAppId = selectedMatch.applicationId || selectedMatch.id;
+          return matchAppId === selectedAppId
+            ? {
+                ...match,
+                status: "Interview Scheduled",
+                interviewScheduled: true,
+              }
+            : match;
+        })
+      );
+
+      setSnackbar({
+        open: true,
+        message: `Interview scheduled with ${selectedMatch?.candidateName}`,
+        severity: "success",
+      });
+      setScheduleDialogOpen(false);
+    } catch (error) {
+      console.error("Error scheduling interview:", error);
+      setSnackbar({
+        open: true,
+        message: `Failed to schedule interview: ${
+          error.message || "Unknown error"
+        }`,
+        severity: "error",
+      });
+    }
   };
 
   const handleCloseDialog = () => {
     setViewDialogOpen(false);
-    setMessageDialogOpen(false);
     setScheduleDialogOpen(false);
     setSelectedMatch(null);
-    setMessageText("");
   };
 
   const handleCloseSnackbar = () => {
@@ -280,6 +443,7 @@ const Matches = () => {
 
   const statusOptions = [
     "All",
+    "Applied",
     "Under Review",
     "Shortlisted",
     "Interview Scheduled",
@@ -296,8 +460,8 @@ const Matches = () => {
           {loading && <CircularProgress size={20} sx={{ ml: 2 }} />}
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          Track candidate applications for jobs - {filteredMatches.length}{" "}
-          matches
+          View candidates who applied for jobs - {totalMatches} candidate
+          {totalMatches !== 1 ? "s" : ""} found
         </Typography>
 
         {/* Search and Filter Bar */}
@@ -320,7 +484,10 @@ const Matches = () => {
             <Select
               value={statusFilter}
               label="Status Filter"
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1); // Reset to first page on filter change
+              }}
               startAdornment={<FilterIcon sx={{ mr: 1 }} />}
             >
               {statusOptions.map((status) => (
@@ -342,97 +509,105 @@ const Matches = () => {
               <TableCell>Company</TableCell>
               <TableCell>Applied Date</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Match Score</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredMatches.map((match) => (
-              <TableRow
-                key={match.id}
-                sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
-              >
-                <TableCell component="th" scope="row">
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Avatar
-                      sx={{ width: 32, height: 32, bgcolor: "primary.main" }}
-                    >
-                      {match.candidateName.charAt(0)}
-                    </Avatar>
-                    {match.candidateName}
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2" fontWeight="medium">
-                    {match.jobTitle}
+            {loading && matches.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <CircularProgress />
+                  <Typography variant="body2" sx={{ mt: 2 }}>
+                    Loading matches...
                   </Typography>
                 </TableCell>
-                <TableCell>{match.company}</TableCell>
-                <TableCell>{match.appliedDate}</TableCell>
-                <TableCell>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Chip
-                      label={match.status}
-                      color={getStatusColor(match.status)}
-                      size="small"
-                    />
-                    {match.interviewScheduled && (
-                      <ScheduleIcon sx={{ fontSize: 16, color: "info.main" }} />
-                    )}
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      minWidth: 100,
-                    }}
-                  >
-                    <LinearProgress
-                      variant="determinate"
-                      value={match.matchScore}
-                      color={getScoreColor(match.matchScore)}
-                      sx={{ width: 60, height: 6, borderRadius: 3 }}
-                    />
-                    <Typography variant="body2" sx={{ minWidth: 35 }}>
-                      {match.matchScore}%
-                    </Typography>
-                  </Box>
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    size="small"
-                    color="primary"
-                    onClick={() => handleViewMatch(match)}
-                  >
-                    <ViewIcon />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    color="secondary"
-                    onClick={() => handleSendMessage(match)}
-                  >
-                    <MessageIcon />
-                  </IconButton>
-                  {!match.interviewScheduled &&
-                    (match.status === "Shortlisted" ||
-                      match.status === "Under Review") && (
-                      <IconButton
-                        size="small"
-                        color="info"
-                        onClick={() => handleScheduleInterview(match)}
-                      >
-                        <ScheduleIcon />
-                      </IconButton>
-                    )}
+              </TableRow>
+            ) : matches.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No matches found. Try adjusting your search or filters.
+                  </Typography>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              matches.map((match) => (
+                <TableRow
+                  key={match.id}
+                  sx={{ "&:last-child td, &:last-child th": { border: 0 } }}
+                >
+                  <TableCell component="th" scope="row">
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Avatar
+                        src={match.profileImage}
+                        alt={match.candidateName}
+                        sx={{ width: 32, height: 32, bgcolor: "primary.main" }}
+                      >
+                        {match.candidateName.charAt(0)}
+                      </Avatar>
+                      {match.candidateName}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight="medium">
+                      {match.jobTitle}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{match.company}</TableCell>
+                  <TableCell>{match.appliedDate}</TableCell>
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Chip
+                        label={match.status}
+                        color={getStatusColor(match.status)}
+                        size="small"
+                      />
+                      {match.interviewScheduled && (
+                        <ScheduleIcon
+                          sx={{ fontSize: 16, color: "info.main" }}
+                        />
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell align="right">
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={() => handleViewMatch(match)}
+                    >
+                      <ViewIcon />
+                    </IconButton>
+                    {!match.interviewScheduled &&
+                      (match.status === "Shortlisted" ||
+                        match.status === "Under Review") && (
+                        <IconButton
+                          size="small"
+                          color="info"
+                          onClick={() => handleScheduleInterview(match)}
+                        >
+                          <ScheduleIcon />
+                        </IconButton>
+                      )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
+          <Pagination
+            count={totalPages}
+            page={currentPage}
+            onChange={(event, value) => setCurrentPage(value)}
+            color="primary"
+            size="large"
+          />
+        </Box>
+      )}
 
       {/* View Match Dialog */}
       <Dialog
@@ -463,94 +638,185 @@ const Matches = () => {
                   <Typography variant="h6" gutterBottom>
                     Candidate Information
                   </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Name:</strong> {selectedMatch.candidateName}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Email:</strong> {selectedMatch.candidateEmail}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Experience:</strong> {selectedMatch.experience}
-                    </Typography>
-                  </Box>
-
-                  <Typography variant="h6" gutterBottom>
-                    Skills
-                  </Typography>
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}
-                  >
-                    {selectedMatch.skills?.map((skill) => (
-                      <Chip
-                        key={skill}
-                        label={skill}
-                        size="small"
-                        variant="outlined"
-                      />
-                    ))}
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>
-                    Job Information
-                  </Typography>
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Position:</strong> {selectedMatch.jobTitle}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Company:</strong> {selectedMatch.company}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Applied:</strong> {selectedMatch.appliedDate}
-                    </Typography>
-                  </Box>
-
-                  <Divider sx={{ my: 2 }} />
-
-                  <Typography variant="h6" gutterBottom>
-                    Match Analysis
-                  </Typography>
                   <Box
                     sx={{
                       display: "flex",
                       alignItems: "center",
                       gap: 2,
-                      mb: 1,
+                      mb: 2,
                     }}
                   >
-                    <Typography variant="body2">Match Score:</Typography>
-                    <LinearProgress
-                      variant="determinate"
-                      value={selectedMatch.matchScore}
-                      color={getScoreColor(selectedMatch.matchScore)}
-                      sx={{ width: 100, height: 8, borderRadius: 4 }}
-                    />
-                    <Typography variant="body2" fontWeight="bold">
-                      {selectedMatch.matchScore}%
+                    <Avatar
+                      src={selectedMatch.profileImage}
+                      alt={selectedMatch.candidateName}
+                      sx={{ width: 64, height: 64, bgcolor: "primary.main" }}
+                    >
+                      {selectedMatch.candidateName?.charAt(0)}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        {selectedMatch.candidateName}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {selectedMatch.candidateEmail}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Experience:</strong>{" "}
+                      {selectedMatch.experience || "N/A"}
                     </Typography>
                   </Box>
 
-                  <Chip
-                    label={selectedMatch.status}
-                    color={getStatusColor(selectedMatch.status)}
-                    sx={{ mt: 2 }}
-                  />
+                  {selectedMatch.resume && (
+                    <>
+                      <Typography variant="h6" gutterBottom>
+                        Resume
+                      </Typography>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        href={selectedMatch.resume}
+                        target="_blank"
+                        sx={{ mb: 2 }}
+                      >
+                        View Resume
+                      </Button>
+                    </>
+                  )}
+                  {selectedMatch.coverLetter && (
+                    <>
+                      <Typography variant="h6" gutterBottom>
+                        Cover Letter
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          p: 2,
+                          bgcolor: "grey.50",
+                          borderRadius: 1,
+                          maxHeight: 200,
+                          overflow: "auto",
+                        }}
+                      >
+                        {selectedMatch.coverLetter}
+                      </Typography>
+                    </>
+                  )}
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom>
+                    Job Post Details
+                  </Typography>
+
+                  {selectedMatch.jobMedia &&
+                    selectedMatch.jobMedia.length > 0 && (
+                      <Box sx={{ mb: 3 }}>
+                        <video
+                          src={selectedMatch.jobMedia[0]}
+                          controls
+                          preload="metadata"
+                          style={{
+                            width: "100%",
+                            maxHeight: 300,
+                            borderRadius: 8,
+                          }}
+                        />
+                      </Box>
+                    )}
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Job Title:</strong> {selectedMatch.jobTitle}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Job Type:</strong>{" "}
+                      {selectedMatch.jobType ? (
+                        <Chip
+                          label={selectedMatch.jobType}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : (
+                        "N/A"
+                      )}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Workplace:</strong>{" "}
+                      {selectedMatch.workPlaceName || "N/A"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Cities:</strong>{" "}
+                      {selectedMatch.jobCities &&
+                      selectedMatch.jobCities.length > 0
+                        ? selectedMatch.jobCities.join(", ")
+                        : "N/A"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>States:</strong>{" "}
+                      {selectedMatch.jobStates &&
+                      selectedMatch.jobStates.length > 0
+                        ? selectedMatch.jobStates.join(", ")
+                        : "N/A"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Notice Period:</strong>{" "}
+                      {selectedMatch.noticePeriod !== undefined
+                        ? `${selectedMatch.noticePeriod} days`
+                        : "N/A"}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Immediate Joiner:</strong>{" "}
+                      {selectedMatch.isImmediateJoiner !== undefined
+                        ? selectedMatch.isImmediateJoiner
+                          ? "Yes"
+                          : "No"
+                        : "N/A"}
+                    </Typography>
+                    {selectedMatch.jobContent && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          <strong>Job Description:</strong>
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            p: 2,
+                            bgcolor: "grey.50",
+                            borderRadius: 1,
+                            maxHeight: 200,
+                            overflow: "auto",
+                          }}
+                        >
+                          {selectedMatch.jobContent}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Applied Date:</strong> {selectedMatch.appliedDate}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Application Status:</strong>{" "}
+                      <Chip
+                        label={selectedMatch.status}
+                        color={getStatusColor(selectedMatch.status)}
+                        size="small"
+                      />
+                    </Typography>
+                  </Box>
                 </Grid>
               </Grid>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button
-            onClick={() => handleSendMessage(selectedMatch)}
-            startIcon={<MessageIcon />}
-            color="secondary"
-          >
-            Send Message
-          </Button>
           {selectedMatch &&
             !selectedMatch.interviewScheduled &&
             (selectedMatch.status === "Shortlisted" ||
@@ -569,44 +835,6 @@ const Matches = () => {
             variant="contained"
           >
             Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Message Dialog */}
-      <Dialog
-        open={messageDialogOpen}
-        onClose={handleCloseDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Send Message to {selectedMatch?.candidateName}
-        </DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Message"
-            multiline
-            rows={4}
-            fullWidth
-            variant="outlined"
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            placeholder="Type your message here..."
-            sx={{ mt: 2 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button
-            onClick={handleSendMessageConfirm}
-            color="primary"
-            variant="contained"
-            disabled={!messageText.trim()}
-          >
-            Send Message
           </Button>
         </DialogActions>
       </Dialog>

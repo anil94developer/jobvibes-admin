@@ -321,7 +321,17 @@ export const resumeApi = {
 
 // Application services
 export const applicationApi = {
-  getAll: () => apiService.get(API_ENDPOINTS.APPLICATIONS.GET_ALL),
+  getAll: (params = {}) => {
+    const { page, limit, search, status, ...rest } = params;
+    const query = {};
+    if (page !== undefined) query.page = page;
+    if (limit !== undefined) query.limit = limit;
+    if (search) query.search = search;
+    if (status) query.status = status;
+    return apiService.get(API_ENDPOINTS.APPLICATIONS.GET_ALL, {
+      params: { ...query, ...rest },
+    });
+  },
 
   getById: (id) => apiService.get(API_ENDPOINTS.APPLICATIONS.GET_BY_ID(id)),
 
@@ -343,7 +353,17 @@ export const applicationApi = {
       interviewData
     ),
 
-  getMatches: () => apiService.get(API_ENDPOINTS.APPLICATIONS.GET_MATCHES),
+  getMatches: (params = {}) => {
+    const { page, limit, search, status, ...rest } = params;
+    const query = {};
+    if (page !== undefined) query.page = page;
+    if (limit !== undefined) query.limit = limit;
+    if (search) query.search = search;
+    if (status) query.status = status;
+    return apiService.get(API_ENDPOINTS.APPLICATIONS.GET_MATCHES, {
+      params: { ...query, ...rest },
+    });
+  },
 };
 
 // Notification services
