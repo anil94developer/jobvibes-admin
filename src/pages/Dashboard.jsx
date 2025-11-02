@@ -36,14 +36,13 @@ const Dashboard = () => {
 
         // ✅ Match your actual API response shape
         if (response?.data) {
-          const { users, jobs, matches } = response.data;
+          const { users, jobs, matches, applications } = response.data;
 
           const newStats = [
             {
               title: "Total Users",
               value: users?.toString() || "0",
               icon: <People sx={{ fontSize: 32 }} />,
-
               isPositive: true,
               path: "/users",
             },
@@ -51,7 +50,6 @@ const Dashboard = () => {
               title: "Job Posts",
               value: jobs?.toString() || "0",
               icon: <Article sx={{ fontSize: 32 }} />,
-
               isPositive: true,
               path: "/posts",
             },
@@ -59,9 +57,15 @@ const Dashboard = () => {
               title: "Matches",
               value: matches?.toString() || "0",
               icon: <Assignment sx={{ fontSize: 32 }} />,
-
               isPositive: true,
               path: "/matches",
+            },
+            {
+              title: "Applications",
+              value: applications?.toString() || "0",
+              icon: <Assignment sx={{ fontSize: 32 }} />,
+              isPositive: true,
+              path: "/applications",
             },
           ];
 

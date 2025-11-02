@@ -41,7 +41,8 @@ import { colors, cardConfigs } from "../theme";
 const Users = () => {
   // State management
   const [users, setUsers] = useState([]);
-  const [stats, setStats] = useState({ totalCandidates: 0, totalEmployers: 0 });
+  const [stats, setStats] = useState({ totalCandidates: 0, totalEmployers: 0 }); // ✨ New State for Server-Side Pagination Total Count
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
@@ -50,39 +51,38 @@ const Users = () => {
     open: false,
     message: "",
     severity: "info",
-  });
+  }); // Pagination state
 
-  // Pagination state
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(5); // Fetch users
 
-  // Fetch users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         console.log("Fetching users...,", page, searchTerm, rowsPerPage);
 
-        setLoading(true);
+        setLoading(true); // API call now sends page and limit (rowsPerPage)
         const response = await userApi.getAll({
           search: searchTerm,
-          page,
+          page: page + 1, // API usually expects 1-based page index, UI uses 0-based
           limit: rowsPerPage,
         });
         setUsers(response?.data || []);
-        setStats(response?.stats || { totalCandidates: 0, totalEmployers: 0 });
+        setStats(response?.stats || { totalCandidates: 0, totalEmployers: 0 }); // 💡 Update totalCount from API response for pagination
+        setTotalCount(response?.stats?.totalUsers || 0);
       } catch (error) {
         console.error("Failed to fetch users:", error);
         setUsers([]);
         setStats({ totalCandidates: 0, totalEmployers: 0 });
+        setTotalCount(0); // Reset total count on error
         showSnackbar("Failed to load users from API", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchUsers();
-  }, [searchTerm, page, rowsPerPage]);
+  }, [searchTerm, page, rowsPerPage]); // Utility functions
 
-  // Utility functions
   const showSnackbar = (message, severity = "info") =>
     setSnackbar({ open: true, message, severity });
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
@@ -105,14 +105,13 @@ const Users = () => {
 
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
-    setPage(0); // Reset page when searching
-  };
+    setPage(0); // Reset page to 0 when searching
+  }; // Pagination handlers
 
-  // Pagination handlers
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    setPage(0); // Reset page to 0 when changing row limit
   };
 
   const getRoleColor = (role) => {
@@ -129,9 +128,8 @@ const Users = () => {
   };
 
   const getStatusColor = (status) =>
-    status === "active" ? "success" : "error";
+    status === "active" ? "success" : "error"; // Format experience array into a string
 
-  // Format experience array into a string
   const formatExperience = (experience) => {
     if (!experience || experience.length === 0) return "None";
     return experience
@@ -140,12 +138,10 @@ const Users = () => {
           `${exp.company_name} (${exp.duration || "Duration not specified"})`
       )
       .join(", ");
-  };
+  }; // Get display name (prefer `name` if available, fallback to `user_name`)
 
-  // Get display name (prefer `name` if available, fallback to `user_name`)
-  const getDisplayName = (user) => user.name || user.user_name || "Unknown";
+  const getDisplayName = (user) => user.name || user.user_name || "Unknown"; // Format qualifications for display
 
-  // Format qualifications for display
   const formatQualifications = (qualifications) => {
     if (!qualifications || qualifications.length === 0) return "None";
     return qualifications
@@ -153,15 +149,13 @@ const Users = () => {
         (qual) => `${qual.school_university_name} (${qual.percentage_grade}%)`
       )
       .join(", ");
-  };
+  }; // Format skills for display
 
-  // Format skills for display
   const formatSkills = (skills) => {
     if (!skills || skills.length === 0) return "None";
     return skills.join(", ");
-  };
+  }; // Determine position based on role
 
-  // Determine position based on role
   const getPosition = (user) => {
     if (user.role === "candidate") {
       return user.job_type && user.job_type.length > 0
@@ -169,9 +163,8 @@ const Users = () => {
         : "Not specified";
     }
     return user.position || user.representative_role || "Not specified";
-  };
+  }; // Get avatar background based on role
 
-  // Get avatar background based on role
   const getAvatarBackground = (role) => {
     switch (role) {
       case "candidate":
@@ -205,6 +198,7 @@ const Users = () => {
         >
           User Management
         </Typography>
+
         <Typography
           variant="h6"
           color="text.secondary"
@@ -213,7 +207,6 @@ const Users = () => {
           Manage candidates and employers
         </Typography>
       </Box>
-
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid item xs={12} md={4}>
@@ -230,10 +223,12 @@ const Users = () => {
                 <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", mr: 2 }}>
                   <People />
                 </Avatar>
+
                 <Box>
                   <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                    {stats.totalUsers}
+                    {stats.totalCandidates}
                   </Typography>
+
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Total Candidates
                   </Typography>
@@ -257,10 +252,12 @@ const Users = () => {
                 <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", mr: 2 }}>
                   <Business />
                 </Avatar>
+
                 <Box>
                   <Typography variant="h4" sx={{ fontWeight: 800 }}>
                     {stats.totalEmployers}
                   </Typography>
+
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Employers
                   </Typography>
@@ -284,10 +281,12 @@ const Users = () => {
                 <Avatar sx={{ bgcolor: "rgba(255,255,255,0.2)", mr: 2 }}>
                   <PersonAdd />
                 </Avatar>
+
                 <Box>
                   <Typography variant="h4" sx={{ fontWeight: 800 }}>
                     {stats.totalEmployers}
                   </Typography>
+
                   <Typography variant="body2" sx={{ opacity: 0.9 }}>
                     Recruiters
                   </Typography>
@@ -297,7 +296,6 @@ const Users = () => {
           </Card>
         </Grid>
       </Grid>
-
       {/* Actions Bar */}
       <Card elevation={0} sx={{ mb: 3, borderRadius: 3 }}>
         <CardContent sx={{ py: 2 }}>
@@ -331,7 +329,6 @@ const Users = () => {
           </Box>
         </CardContent>
       </Card>
-
       {/* Users Table */}
       <Card elevation={0} sx={{ borderRadius: 3 }}>
         <TableContainer>
@@ -340,7 +337,7 @@ const Users = () => {
               <TableRow sx={{ bgcolor: alpha(colors.solid.primary, 0.05) }}>
                 <TableCell sx={{ fontWeight: 700, py: 2 }}>User</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Email</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Role</TableCell>{" "}
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Join Date</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 700 }}>
@@ -348,6 +345,7 @@ const Users = () => {
                 </TableCell>
               </TableRow>
             </TableHead>
+
             <TableBody>
               {loading ? (
                 <TableRow>
@@ -392,21 +390,25 @@ const Users = () => {
                         >
                           {getDisplayName(user).charAt(0)}
                         </Avatar>
+
                         <Box>
                           <Typography variant="body1" sx={{ fontWeight: 600 }}>
                             {getDisplayName(user)}
                           </Typography>
+
                           <Typography variant="caption" color="text.secondary">
                             ID: {user._id}
                           </Typography>
                         </Box>
                       </Box>
                     </TableCell>
+
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
                         {user.email || "Not provided"}
                       </Typography>
                     </TableCell>
+
                     <TableCell>
                       <Chip
                         label={
@@ -420,6 +422,7 @@ const Users = () => {
                         sx={{ borderRadius: 2, fontWeight: 600 }}
                       />
                     </TableCell>
+
                     <TableCell>
                       <Chip
                         label={
@@ -433,6 +436,7 @@ const Users = () => {
                         sx={{ borderRadius: 2, fontWeight: 600 }}
                       />
                     </TableCell>
+
                     <TableCell>
                       <Typography variant="body2">
                         {user.createdAt
@@ -440,6 +444,7 @@ const Users = () => {
                           : "Not provided"}
                       </Typography>
                     </TableCell>
+
                     <TableCell align="right">
                       <IconButton
                         size="small"
@@ -460,19 +465,18 @@ const Users = () => {
             </TableBody>
           </Table>
         </TableContainer>
-
         {/* Pagination */}
+
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={users.length}
+          count={totalCount} // ✅ FIX: Using server-side total count
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </Card>
-
       {/* User View Dialog */}
       <Dialog
         open={viewDialogOpen}
@@ -492,6 +496,7 @@ const Users = () => {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
+
         <DialogContent>
           {selectedUser && (
             <Box sx={{ pt: 2 }}>
@@ -508,10 +513,12 @@ const Users = () => {
                 >
                   {getDisplayName(selectedUser).charAt(0)}
                 </Avatar>
+
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     {getDisplayName(selectedUser)}
                   </Typography>
+
                   <Typography
                     variant="body2"
                     color="text.secondary"
@@ -519,6 +526,7 @@ const Users = () => {
                   >
                     {selectedUser.email || "Not provided"}
                   </Typography>
+
                   <Chip
                     label={
                       selectedUser.role
@@ -537,14 +545,17 @@ const Users = () => {
                   <Typography variant="subtitle2" color="text.secondary">
                     Name
                   </Typography>
+
                   <Typography variant="body1">
                     {selectedUser.name || "Not provided"}
                   </Typography>
                 </Grid>
+
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Status
                   </Typography>
+
                   <Chip
                     label={
                       selectedUser.status
@@ -556,44 +567,54 @@ const Users = () => {
                     size="small"
                   />
                 </Grid>
+
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Phone
                   </Typography>
+
                   <Typography variant="body1">
                     {selectedUser.phone_number || "Not provided"}
                   </Typography>
                 </Grid>
+
                 <Grid item xs={6}>
                   <Typography variant="subtitle2" color="text.secondary">
                     Position
                   </Typography>
+
                   <Typography variant="body1">
                     {getPosition(selectedUser)}
                   </Typography>
                 </Grid>
+
                 {selectedUser.role === "candidate" && (
                   <>
                     <Grid item xs={6}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Experience
                       </Typography>
+
                       <Typography variant="body1">
                         {formatExperience(selectedUser.experience)}
                       </Typography>
                     </Grid>
+
                     <Grid item xs={6}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Skills
                       </Typography>
+
                       <Typography variant="body1">
                         {formatSkills(selectedUser.skills)}
                       </Typography>
                     </Grid>
+
                     <Grid item xs={12}>
                       <Typography variant="subtitle2" color="text.secondary">
                         Qualifications
                       </Typography>
+
                       <Typography variant="body1">
                         {formatQualifications(selectedUser.qualifications)}
                       </Typography>
@@ -605,17 +626,20 @@ const Users = () => {
                   <Typography variant="subtitle2" color="text.secondary">
                     Join Date
                   </Typography>
+
                   <Typography variant="body1">
                     {selectedUser.createdAt
                       ? new Date(selectedUser.createdAt).toLocaleDateString()
                       : "Not provided"}
                   </Typography>
                 </Grid>
+
                 {selectedUser.role === "employer" && (
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" color="text.secondary">
                       Company Name
                     </Typography>
+
                     <Typography variant="body1">
                       {selectedUser.company_name || "Not provided"}
                     </Typography>
@@ -625,11 +649,11 @@ const Users = () => {
             </Box>
           )}
         </DialogContent>
+
         <DialogActions>
           <Button onClick={() => setViewDialogOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>
-
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}

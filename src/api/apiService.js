@@ -153,6 +153,21 @@ class ApiService {
       body: formData,
     });
   }
+
+  /**
+   * POST multipart/form-data with a prebuilt FormData
+   */
+  async postFormData(url, formData, options = {}) {
+    const headers = { ...this.getAuthHeaders() };
+    delete headers["Content-Type"]; // Let browser set multipart/form-data
+
+    return this.request(url, {
+      ...options,
+      method: HTTP_METHODS.POST,
+      headers,
+      body: formData,
+    });
+  }
 }
 
 // Create singleton instance
@@ -206,7 +221,16 @@ export const userApi = {
 
 // Job services
 export const feedApi = {
-  getAll: () => apiService.get(API_ENDPOINTS.JOBS.GET_ALL),
+  getAll: (params = {}) => {
+    const { page, limit, status, ...rest } = params;
+    const query = {};
+    if (page !== undefined) query.page = page;
+    if (limit !== undefined) query.limit = limit;
+    if (status) query.status = status; // send status filter to backend
+    return apiService.get(API_ENDPOINTS.JOBS.GET_ALL, {
+      params: { ...query, ...rest },
+    });
+  },
 
   getById: (id) => apiService.get(API_ENDPOINTS.JOBS.GET_BY_ID(id)),
 
@@ -214,7 +238,25 @@ export const feedApi = {
 
   reject: (id) => apiService.put(API_ENDPOINTS.JOBS.REJECT(id)),
 
-  create: (jobData) => apiService.post(API_ENDPOINTS.JOBS.CREATE, jobData),
+  create: (jobData) => {
+    // If a File is present, send multipart/form-data so backend multer can process media
+    const hasFile = jobData && jobData.media && jobData.media instanceof File;
+    if (!hasFile) {
+      return apiService.post(API_ENDPOINTS.JOBS.CREATE, jobData);
+    }
+
+    const formData = new FormData();
+    // Append text fields (Mongoose will cast scalars to arrays where needed)
+    Object.entries(jobData).forEach(([key, value]) => {
+      if (key === "media") return; // handled below
+      if (value === undefined || value === null) return;
+      formData.append(key, String(value));
+    });
+    // Append media file under field name expected by backend: "media"
+    formData.append("media", jobData.media);
+
+    return apiService.postFormData(API_ENDPOINTS.JOBS.CREATE, formData);
+  },
 
   update: (id, jobData) =>
     apiService.put(API_ENDPOINTS.JOBS.UPDATE(id), jobData),
@@ -225,8 +267,15 @@ export const feedApi = {
 
   unpublish: (id) => apiService.post(API_ENDPOINTS.JOBS.UNPUBLISH(id)),
 
-  uploadVideo: (id, file) =>
-    apiService.uploadFile(API_ENDPOINTS.JOBS.UPLOAD_VIDEO(id), file),
+  uploadVideo: (id, file) => {
+    const formData = new FormData();
+    // Backend expects field name "video" (multer array("video"))
+    formData.append("video", file);
+    return apiService.postFormData(
+      API_ENDPOINTS.JOBS.UPLOAD_VIDEO(id),
+      formData
+    );
+  },
 
   search: (query) =>
     apiService.get(

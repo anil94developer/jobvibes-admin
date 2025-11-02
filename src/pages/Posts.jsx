@@ -69,6 +69,9 @@ const Posts = () => {
   // Mock admin check (replace with real auth logic)
   const isAdmin = true;
 
+  // Allowed/maintained statuses
+  const VALID_STATUSES = ["approved", "rejected", "pending"];
+
   // Fetch jobs from API
   useEffect(() => {
     const fetchJobs = async () => {
@@ -84,15 +87,32 @@ const Posts = () => {
         const data = response?.data?.results || [];
         const pagination = response?.data?.pagination || { totalPages: 1 };
 
-        setJobs(
-          data.map((job) => ({
-            ...job,
-            videoStatus:
-              job.media?.length > 0 ? job.videoStatus || "pending" : undefined,
-          }))
-        );
+        // Normalize statuses
+        const normalizedJobs = data.map((job) => {
+          const rawStatus = job?.status
+            ? String(job.status).toLowerCase()
+            : "pending";
+          const normalizedStatus = VALID_STATUSES.includes(rawStatus)
+            ? rawStatus
+            : "pending";
 
-        setTotalPages(pagination.totalPages || 1);
+          const rawVideoStatus = job?.videoStatus
+            ? String(job.videoStatus).toLowerCase()
+            : "pending";
+          const normalizedVideoStatus = VALID_STATUSES.includes(rawVideoStatus)
+            ? rawVideoStatus
+            : "pending";
+
+          return {
+            ...job,
+            status: normalizedStatus,
+            videoStatus:
+              job?.media?.length > 0 ? normalizedVideoStatus : undefined,
+          };
+        });
+
+        setJobs(normalizedJobs);
+        setTotalPages(pagination.totalPages || 1); // Use server-provided totalPages
         showSnackbar("Jobs fetched successfully", "success");
       } catch (error) {
         console.error("Error fetching jobs:", error);
@@ -104,21 +124,7 @@ const Posts = () => {
     };
 
     fetchJobs();
-  }, [currentPage, statusFilter]);
-
-  // Update totalPages when statusFilter changes
-  useEffect(() => {
-    const filteredJobs =
-      statusFilter === "All"
-        ? jobs
-        : jobs.filter((job) => job.status === statusFilter.toLowerCase());
-    const calculatedTotalPages =
-      Math.ceil(filteredJobs.length / jobsPerPage) || 1;
-    setTotalPages(calculatedTotalPages);
-    if (currentPage > calculatedTotalPages) {
-      setCurrentPage(1); // Reset to first page if currentPage exceeds totalPages
-    }
-  }, [statusFilter, jobs]);
+  }, [currentPage, statusFilter]); // Remove jobsPerPage, VALID_STATUSES from deps
 
   // Utility functions
   const showSnackbar = (message, severity = "info") => {
@@ -141,12 +147,6 @@ const Posts = () => {
 
   const handleCreateJob = async () => {
     try {
-      let mediaUrl = [];
-      if (newJob.media && isAdmin) {
-        const uploadResponse = await feedApi.uploadMedia(newJob.media);
-        mediaUrl = [uploadResponse.data.url];
-      }
-
       const jobData = {
         job_title: [newJob.job_title],
         content: newJob.content,
@@ -155,20 +155,26 @@ const Posts = () => {
         cities: [newJob.cities],
         notice_period: parseInt(newJob.notice_period, 10) || 0,
         is_immediate_joiner: newJob.is_immediate_joiner,
-        media: mediaUrl,
-        status: "pending", // Set initial status to pending
-        videoStatus: mediaUrl.length > 0 ? "pending" : undefined,
+        // If a File is present, the API layer will send multipart as "media"
+        media: newJob.media || undefined,
+        status: "pending",
       };
 
       const response = await feedApi.create(jobData);
+      const created = response?.data || {};
       const newJobWithId = {
-        ...jobData,
-        _id: response.data._id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        noOfReactions: 0,
-        authorRole: isAdmin ? "employer" : "candidate",
-        videoStatus: mediaUrl.length > 0 ? "pending" : undefined,
+        ...created,
+        // Normalize fields for UI if backend returns arrays/values
+        job_title: created.job_title || [newJob.job_title],
+        work_place_name: created.work_place_name || [newJob.work_place_name],
+        job_type: created.job_type || [newJob.job_type],
+        cities: created.cities || [newJob.cities],
+        media: Array.isArray(created.media) ? created.media : [],
+        status: created.status || "pending",
+        videoStatus:
+          created.media && created.media.length > 0 ? "pending" : undefined,
+        noOfReactions: created.noOfReactions ?? 0,
+        authorRole: created.authorRole || (isAdmin ? "employer" : "candidate"),
       };
 
       setJobs((prev) => [newJobWithId, ...prev]);
@@ -209,7 +215,7 @@ const Posts = () => {
       setCreateDialogOpen(true);
     } else {
       showSnackbar(
-        job.authorRole !== "employer"
+        job?.authorRole !== "employer"
           ? "Only admin-posted jobs can be edited"
           : "Unauthorized to edit job",
         "error"
@@ -219,13 +225,73 @@ const Posts = () => {
 
   const handleAddVideo = (jobId) => {
     const job = jobs.find((j) => j._id === jobId);
-    if (job && job.authorRole === "employer" && isAdmin) {
-      setSelectedJob(job);
-      setVideoFile(null);
-      setVideoDialogOpen(true);
+    // allow only for admin + no existing media
+    if (
+      job &&
+      (job.media?.length === 0 || job.media === undefined) &&
+      isAdmin
+    ) {
+      // create a hidden file input to trigger native file picker
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "video/mp4,video/webm,video/ogg";
+      input.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) {
+          showSnackbar("No file selected", "error");
+          return;
+        }
+        if (!["video/mp4", "video/webm", "video/ogg"].includes(file.type)) {
+          showSnackbar(
+            "Please select a valid video file (MP4, WebM, OGG)",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          setActionLoading((prev) => ({ ...prev, [jobId]: true }));
+
+          // upload to Cloudinary (via feedApi)
+          const uploadResponse = await feedApi.uploadVideo(jobId, file);
+          const mediaUrl = uploadResponse?.data?.[0]?.url;
+          if (!mediaUrl) throw new Error("Upload did not return a media URL");
+
+          // save url to feed
+          await feedApi.update(jobId, {
+            media: [mediaUrl],
+            videoStatus: "pending",
+          });
+
+          // update local state
+          setJobs((prev) =>
+            prev.map((j) =>
+              j._id === jobId
+                ? { ...j, media: [mediaUrl], videoStatus: "pending" }
+                : j
+            )
+          );
+
+          showSnackbar(
+            "Video uploaded successfully, pending approval!",
+            "success"
+          );
+        } catch (error) {
+          console.error("Error uploading video:", error);
+          showSnackbar(
+            `Failed to upload video: ${error.message || error}`,
+            "error"
+          );
+        } finally {
+          setActionLoading((prev) => ({ ...prev, [jobId]: false }));
+        }
+      };
+
+      // trigger file picker
+      input.click();
     } else {
       showSnackbar(
-        job.authorRole !== "employer"
+        job?.authorRole !== "employer"
           ? "Only admin-posted jobs can have videos added"
           : "Unauthorized to add video",
         "error"
@@ -233,38 +299,51 @@ const Posts = () => {
     }
   };
 
-  const handleSaveVideo = async () => {
+  const handleSaveVideo = async (jobId) => {
+    if (!jobId) {
+      showSnackbar("No job selected", "error");
+      return;
+    }
     if (!videoFile) {
       showSnackbar("Please select a video file", "error");
       return;
     }
     try {
-      setActionLoading((prev) => ({ ...prev, [selectedJob._id]: true }));
-      const uploadResponse = await feedApi.uploadMedia(videoFile);
-      const mediaUrl = uploadResponse.data.url;
+      setActionLoading((prev) => ({ ...prev, [jobId]: true }));
 
-      const updatedJob = {
-        ...selectedJob,
-        media: [mediaUrl],
-        videoStatus: "pending",
-      };
-      await feedApi.update(selectedJob._id, {
+      // upload video
+      const uploadResponse = await feedApi.uploadVideo(jobId, videoFile);
+      const mediaUrl = uploadResponse?.data?.[0]?.url;
+      if (!mediaUrl) throw new Error("Upload did not return a media URL");
+
+      // save url to feed
+      await feedApi.update(jobId, {
         media: [mediaUrl],
         videoStatus: "pending",
       });
 
+      // update local state
       setJobs((prev) =>
-        prev.map((job) => (job._id === selectedJob._id ? updatedJob : job))
+        prev.map((j) =>
+          j._id === jobId
+            ? { ...j, media: [mediaUrl], videoStatus: "pending" }
+            : j
+        )
       );
+
+      // cleanup and UI
       setVideoDialogOpen(false);
       setSelectedJob(null);
       setVideoFile(null);
       showSnackbar("Video uploaded successfully, pending approval!", "success");
     } catch (error) {
       console.error("Error uploading video:", error);
-      showSnackbar(`Failed to upload video: ${error.message}`, "error");
+      showSnackbar(
+        `Failed to upload video: ${error.message || error}`,
+        "error"
+      );
     } finally {
-      setActionLoading((prev) => ({ ...prev, [selectedJob._id]: false }));
+      setActionLoading((prev) => ({ ...prev, [jobId]: false }));
     }
   };
 
@@ -331,15 +410,8 @@ const Posts = () => {
     }
   };
 
-  // Filter and paginate jobs
-  const filteredJobs =
-    statusFilter === "All"
-      ? jobs
-      : jobs.filter((job) => job.status === statusFilter.toLowerCase());
-
-  const indexOfLastJob = currentPage * jobsPerPage;
-  const indexOfFirstJob = indexOfLastJob - jobsPerPage;
-  const currentJobs = filteredJobs.slice(indexOfFirstJob, indexOfLastJob);
+  // Already paginated and filtered by server
+  const currentJobs = jobs;
 
   const handlePageChange = (event, value) => {
     setCurrentPage(value);
@@ -416,9 +488,11 @@ const Posts = () => {
               }}
             >
               <MenuItem value="All">All</MenuItem>
-              <MenuItem value="Active">Active</MenuItem>
-              <MenuItem value="Inactive">Inactive</MenuItem>
-              <MenuItem value="Pending">Pending</MenuItem>
+              {VALID_STATUSES.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <Button
@@ -447,7 +521,7 @@ const Posts = () => {
             Loading job posts...
           </Typography>
         </Box>
-      ) : filteredJobs.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <Box
           sx={{
             display: "flex",
@@ -478,10 +552,10 @@ const Posts = () => {
                       transform: "translateY(-4px)",
                       boxShadow: 6,
                     },
-                    borderRadius: 3,
+                    borderRadius: 2,
                   }}
                 >
-                  {job.media.length > 0 && (
+                  {job?.media?.length > 0 && (
                     <Box
                       sx={{
                         position: "relative",
@@ -517,10 +591,17 @@ const Posts = () => {
                         component="h2"
                         sx={{ overflowWrap: "break-word" }}
                       >
-                        {job.job_title[0]}
+                        {Array.isArray(job.job_title)
+                          ? job.job_title[0]
+                          : job.job_title}
                       </Typography>
                       <Chip
-                        label={job.status}
+                        label={
+                          job.status
+                            ? job.status.charAt(0).toUpperCase() +
+                              job.status.slice(1)
+                            : "Unknown"
+                        }
                         color={getStatusColor(job.status)}
                         size="small"
                       />
@@ -554,7 +635,7 @@ const Posts = () => {
                         sx={{ fontSize: 18, color: "text.secondary" }}
                       />
                       <Typography variant="body2" color="text.secondary">
-                        {job.cities[0]}
+                        {Array.isArray(job.cities) ? job.cities[0] : job.cities}
                       </Typography>
                     </Box>
 
@@ -562,8 +643,16 @@ const Posts = () => {
                       sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}
                     >
                       <Chip
-                        label={job.job_type[0]}
-                        color={getTypeColor(job.job_type[0])}
+                        label={
+                          Array.isArray(job.job_type)
+                            ? job.job_type[0]
+                            : job.job_type
+                        }
+                        color={getTypeColor(
+                          Array.isArray(job.job_type)
+                            ? job.job_type[0]
+                            : job.job_type
+                        )}
                         size="small"
                       />
                       <Chip
@@ -623,11 +712,15 @@ const Posts = () => {
                           textTransform: "none",
                           "&:hover": { boxShadow: 2 },
                         }}
-                        aria-label={`View details of ${job.job_title[0]}`}
+                        aria-label={`View details of ${
+                          Array.isArray(job.job_title)
+                            ? job.job_title[0]
+                            : job.job_title
+                        }`}
                       >
                         View
                       </Button>
-                      {job.authorRole === "employer" && isAdmin && (
+                      {job.authorRole === "admin" && isAdmin && (
                         <Button
                           size="medium"
                           variant="contained"
@@ -640,7 +733,11 @@ const Posts = () => {
                             textTransform: "none",
                             "&:hover": { boxShadow: 2 },
                           }}
-                          aria-label={`Edit ${job.job_title[0]}`}
+                          aria-label={`Edit ${
+                            Array.isArray(job.job_title)
+                              ? job.job_title[0]
+                              : job.job_title
+                          }`}
                         >
                           Edit
                         </Button>
@@ -698,7 +795,7 @@ const Posts = () => {
                       </Box>
                     )}
 
-                    {isAdmin && job.authorRole === "employer" && (
+                    {isAdmin && job.media?.length === 0 && (
                       <Box
                         sx={{
                           display: "flex",
@@ -719,7 +816,11 @@ const Posts = () => {
                             textTransform: "none",
                             "&:hover": { boxShadow: 2 },
                           }}
-                          aria-label={`Add video to ${job.job_title[0]}`}
+                          aria-label={`Add video to ${
+                            Array.isArray(job.job_title)
+                              ? job.job_title[0]
+                              : job.job_title
+                          }`}
                         >
                           Add Video
                         </Button>
@@ -776,10 +877,12 @@ const Posts = () => {
           {selectedJob && (
             <Box>
               <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
-                {selectedJob.job_title[0]}
+                {Array.isArray(selectedJob.job_title)
+                  ? selectedJob.job_title[0]
+                  : selectedJob.job_title}
               </Typography>
 
-              {selectedJob.media.length > 0 ? (
+              {selectedJob?.media?.length > 0 ? (
                 <Box
                   sx={{
                     mb: 3,
@@ -792,7 +895,11 @@ const Posts = () => {
                 >
                   <iframe
                     src={selectedJob.media[0]}
-                    title={`Video for ${selectedJob.job_title[0]}`}
+                    title={`Video for ${
+                      Array.isArray(selectedJob.job_title)
+                        ? selectedJob.job_title[0]
+                        : selectedJob.job_title
+                    }`}
                     style={{
                       width: "100%",
                       height: "100%",
@@ -802,7 +909,12 @@ const Posts = () => {
                     allowFullScreen
                   />
                   <Chip
-                    label={`Video: ${selectedJob.videoStatus}`}
+                    label={`Video: ${
+                      selectedJob.videoStatus
+                        ? selectedJob.videoStatus.charAt(0).toUpperCase() +
+                          selectedJob.videoStatus.slice(1)
+                        : "Unknown"
+                    }`}
                     color={getVideoStatusColor(selectedJob.videoStatus)}
                     size="small"
                     sx={{
@@ -845,7 +957,9 @@ const Posts = () => {
                     Location
                   </Typography>
                   <Typography variant="body1">
-                    {selectedJob.cities[0]}
+                    {Array.isArray(selectedJob.cities)
+                      ? selectedJob.cities[0]
+                      : selectedJob.cities}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -856,7 +970,14 @@ const Posts = () => {
                   >
                     Job Type
                   </Typography>
-                  <Chip label={selectedJob.job_type[0]} size="small" />
+                  <Chip
+                    label={
+                      Array.isArray(selectedJob.job_type)
+                        ? selectedJob.job_type[0]
+                        : selectedJob.job_type
+                    }
+                    size="small"
+                  />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography
@@ -867,7 +988,9 @@ const Posts = () => {
                     Workplace
                   </Typography>
                   <Typography variant="body1">
-                    {selectedJob.work_place_name[0]}
+                    {Array.isArray(selectedJob.work_place_name)
+                      ? selectedJob.work_place_name[0]
+                      : selectedJob.work_place_name}
                   </Typography>
                 </Grid>
                 <Grid item xs={12} sm={6}>
@@ -927,7 +1050,12 @@ const Posts = () => {
                     Status
                   </Typography>
                   <Chip
-                    label={selectedJob.status}
+                    label={
+                      selectedJob.status
+                        ? selectedJob.status.charAt(0).toUpperCase() +
+                          selectedJob.status.slice(1)
+                        : "Unknown"
+                    }
                     color={getStatusColor(selectedJob.status)}
                     size="small"
                   />
@@ -1099,7 +1227,7 @@ const Posts = () => {
         onClose={() => setVideoDialogOpen(false)}
         maxWidth="sm"
         fullWidth
-        sx={{ "& .MuiDialog-paper": { borderRadius: 3 } }}
+        sx={{ "& .MuiDialog-paper": { borderRadius: 2 } }}
       >
         <DialogTitle sx={{ fontWeight: "bold" }}>
           Add Video to Job Post
@@ -1136,7 +1264,7 @@ const Posts = () => {
             Cancel
           </Button>
           <Button
-            onClick={handleSaveVideo}
+            onClick={() => handleSaveVideo(selectedJob?._id)}
             variant="contained"
             disabled={!videoFile || actionLoading[selectedJob?._id]}
             sx={{ borderRadius: 2 }}
