@@ -250,7 +250,15 @@ export const feedApi = {
     Object.entries(jobData).forEach(([key, value]) => {
       if (key === "media") return; // handled below
       if (value === undefined || value === null) return;
-      formData.append(key, String(value));
+      
+      // Handle arrays (cities, states, job_title, etc.)
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          formData.append(key, String(item));
+        });
+      } else {
+        formData.append(key, String(value));
+      }
     });
     // Append media file under field name expected by backend: "media"
     formData.append("media", jobData.media);
@@ -399,8 +407,24 @@ export const settingsApi = {
 // Export API service module
 export const stateCityApi = {
   getStates: () => apiService.get(API_ENDPOINTS.STATE_CITY.GET_STATES),
-  getCities: (state) =>
-    apiService.get(API_ENDPOINTS.STATE_CITY.GET_CITIES(state)),
+  getCities: (stateId) => {
+    // Handle both object format { state: stateId } and direct stateId
+    const actualStateId = typeof stateId === "object" ? stateId.state : stateId;
+    return apiService.get(API_ENDPOINTS.STATE_CITY.GET_CITIES(actualStateId));
+  },
+  createCity: (stateId, cityData) => {
+    // Handle both object format { state: stateId } and direct stateId
+    const actualStateId =
+      typeof stateId === "object" ? stateId.state : stateId;
+    return apiService.post(
+      API_ENDPOINTS.STATE_CITY.CREATE_CITY(actualStateId),
+      cityData
+    );
+  },
+  updateCity: (cityId, cityData) =>
+    apiService.put(API_ENDPOINTS.STATE_CITY.UPDATE_CITY(cityId), cityData),
+  deleteCity: (cityId) =>
+    apiService.delete(API_ENDPOINTS.STATE_CITY.DELETE_CITY(cityId)),
 };
 
 export default apiService;

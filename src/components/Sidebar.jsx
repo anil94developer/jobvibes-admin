@@ -13,6 +13,8 @@ import {
 import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
+  LocationOn as LocationOnIcon,
+  ConnectWithoutContact as MatchesIcon,
   // Article as ArticleIcon,
   // Description as DescriptionIcon,
   // ConnectWithoutContact as MatchesIcon,
@@ -42,11 +44,11 @@ const menuItems = [
     icon: <Feed />,
     path: "/posts",
   },
-  // {
-  //   text: "State & City",
-  //   icon: <ArticleIcon />,
-  //   path: "/state-city",
-  // },
+  {
+    text: "State & City",
+    icon: <LocationOnIcon />,
+    path: "/state-city",
+  },
   // {
   //   text: "Posts",
   //   icon: <ArticleIcon />,
@@ -57,11 +59,11 @@ const menuItems = [
   //   icon: <DescriptionIcon />,
   //   path: "/resumes",
   // },
-  // {
-  //   text: "Matches",
-  //   icon: <MatchesIcon />,
-  //   path: "/matches",
-  // },
+  {
+    text: "Matches",
+    icon: <MatchesIcon />,
+    path: "/matches",
+  },
   // {
   //   text: "Notifications",
   //   icon: <NotificationsIcon />,

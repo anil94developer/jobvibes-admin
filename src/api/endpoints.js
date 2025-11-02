@@ -147,6 +147,15 @@ export const API_ENDPOINTS = {
     GENERATE_APPLICATION_REPORT: `${API_BASE_URL}/reports/applications`,
     EXPORT_DATA: (type) => `${API_BASE_URL}/reports/export/${type}`,
   },
+
+  // State & City APIs
+  STATE_CITY: {
+    GET_STATES: `${API_BASE_URL}/v1/states`,
+    GET_CITIES: (stateId) => `${API_BASE_URL}/v1/states/${stateId}/cities`,
+    CREATE_CITY: (stateId) => `${API_BASE_URL}/v1/states/${stateId}/cities`,
+    UPDATE_CITY: (cityId) => `${API_BASE_URL}/v1/cities/${cityId}`,
+    DELETE_CITY: (cityId) => `${API_BASE_URL}/v1/cities/${cityId}`,
+  },
 };
 
 // HTTP Methods for different operations

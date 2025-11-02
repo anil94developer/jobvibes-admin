@@ -21,6 +21,8 @@ import {
   Snackbar,
   Alert,
   Pagination,
+  Checkbox,
+  ListItemText,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -33,7 +35,7 @@ import {
   Check as CheckIcon,
   Cancel as CancelIcon,
 } from "@mui/icons-material";
-import { feedApi } from "../api";
+import { feedApi, stateCityApi } from "../api";
 
 const Posts = () => {
   // State management
@@ -49,11 +51,19 @@ const Posts = () => {
     work_place_name: "On-site",
     job_type: "Full-time",
     cities: "",
+    state: [], // Array for multi-select states
+    city: [], // Array for multi-select cities
     notice_period: 0,
     is_immediate_joiner: false,
     media: null,
     videoStatus: "pending",
   });
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [statePage, setStatePage] = useState(1);
+  const [cityPage, setCityPage] = useState(1);
+  const itemsPerPage = 10;
   const [videoFile, setVideoFile] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -71,6 +81,66 @@ const Posts = () => {
 
   // Allowed/maintained statuses
   const VALID_STATUSES = ["approved", "rejected", "pending"];
+
+  // Fetch states on component mount
+  useEffect(() => {
+    const fetchStates = async () => {
+      try {
+        const response = await stateCityApi.getStates();
+        setStates(response?.data || []);
+      } catch (error) {
+        console.error("Error fetching states:", error);
+        showSnackbar("Failed to fetch states", "error");
+      }
+    };
+    fetchStates();
+  }, []);
+
+  // Fetch cities when states are selected
+  useEffect(() => {
+    const fetchCities = async () => {
+      if (!newJob.state || newJob.state.length === 0) {
+        setCities([]);
+        setNewJob((prev) => ({ ...prev, city: [] }));
+        return;
+      }
+
+      try {
+        setLoadingCities(true);
+        // Fetch cities for all selected states
+        const cityPromises = newJob.state.map((stateId) =>
+          stateCityApi.getCities(stateId)
+        );
+        const responses = await Promise.all(cityPromises);
+
+        // Combine all cities from all selected states
+        const allCities = [];
+        const cityMap = new Map(); // Use Map to avoid duplicates
+
+        responses.forEach((response) => {
+          const citiesData = response?.data?.results || response?.data || [];
+          citiesData.forEach((city) => {
+            // Use _id as key to avoid duplicates
+            if (!cityMap.has(city._id)) {
+              cityMap.set(city._id, city);
+              allCities.push(city);
+            }
+          });
+        });
+
+        setCities(allCities);
+        setCityPage(1); // Reset city page when cities are loaded
+      } catch (error) {
+        console.error("Error fetching cities:", error);
+        showSnackbar("Failed to fetch cities", "error");
+        setCities([]);
+      } finally {
+        setLoadingCities(false);
+      }
+    };
+
+    fetchCities();
+  }, [newJob.state]);
 
   // Fetch jobs from API
   useEffect(() => {
@@ -147,12 +217,23 @@ const Posts = () => {
 
   const handleCreateJob = async () => {
     try {
+      // Get state names from selected state IDs
+      const selectedStateNames = states
+        .filter((s) => newJob.state.includes(s._id))
+        .map((s) => s.name);
+
+      // Get city names from selected city IDs
+      const selectedCityNames = cities
+        .filter((c) => newJob.city.includes(c._id))
+        .map((c) => c.name);
+
       const jobData = {
         job_title: [newJob.job_title],
         content: newJob.content,
         work_place_name: [newJob.work_place_name],
         job_type: [newJob.job_type],
-        cities: [newJob.cities],
+        cities: selectedCityNames, // Array of city names
+        states: selectedStateNames, // Array of state names
         notice_period: parseInt(newJob.notice_period, 10) || 0,
         is_immediate_joiner: newJob.is_immediate_joiner,
         // If a File is present, the API layer will send multipart as "media"
@@ -160,7 +241,14 @@ const Posts = () => {
         status: "pending",
       };
 
-      const response = await feedApi.create(jobData);
+      let response;
+      if (newJob._id) {
+        // Update existing post
+        response = await feedApi.update(newJob._id, jobData);
+      } else {
+        // Create new post
+        response = await feedApi.create(jobData);
+      }
       const created = response?.data || {};
       const newJobWithId = {
         ...created,
@@ -168,7 +256,8 @@ const Posts = () => {
         job_title: created.job_title || [newJob.job_title],
         work_place_name: created.work_place_name || [newJob.work_place_name],
         job_type: created.job_type || [newJob.job_type],
-        cities: created.cities || [newJob.cities],
+        cities: created.cities || selectedCityNames,
+        states: created.states || selectedStateNames,
         media: Array.isArray(created.media) ? created.media : [],
         status: created.status || "pending",
         videoStatus:
@@ -177,7 +266,18 @@ const Posts = () => {
         authorRole: created.authorRole || (isAdmin ? "employer" : "candidate"),
       };
 
-      setJobs((prev) => [newJobWithId, ...prev]);
+      if (newJob._id) {
+        // Update existing job in the list
+        setJobs((prev) =>
+          prev.map((j) => (j._id === newJob._id ? newJobWithId : j))
+        );
+        showSnackbar("Job updated successfully!", "success");
+      } else {
+        // Add new job to the list
+        setJobs((prev) => [newJobWithId, ...prev]);
+        showSnackbar("Job posted successfully!", "success");
+      }
+
       setCreateDialogOpen(false);
       setNewJob({
         job_title: "",
@@ -185,41 +285,112 @@ const Posts = () => {
         work_place_name: "On-site",
         job_type: "Full-time",
         cities: "",
+        state: [],
+        city: [],
         notice_period: 0,
         is_immediate_joiner: false,
         media: null,
         videoStatus: "pending",
       });
-      showSnackbar("Job posted successfully!", "success");
+      setCities([]);
     } catch (error) {
       console.error("Error creating job:", error);
       showSnackbar(`Failed to create job: ${error.message}`, "error");
     }
   };
 
-  const handleEditJob = (jobId) => {
+  const handleEditJob = async (jobId) => {
     const job = jobs.find((j) => j._id === jobId);
-    if (job && job.authorRole === "employer" && isAdmin) {
+    // Only allow editing if: job exists, job was created by admin (authorRole === "employer"), and current user is admin
+    if (job && isAdmin && job.authorRole === "admin") {
+      // Find the state IDs from the state names
+      const stateNames =
+        Array.isArray(job.states) && job.states.length > 0 ? job.states : [];
+
+      const stateIds = stateNames
+        .map((stateName) => {
+          const matchedState = states.find((s) => s.name === stateName);
+          return matchedState ? matchedState._id : null;
+        })
+        .filter(Boolean);
+
+      // Find city IDs from city names
+      const cityNames = Array.isArray(job.cities) ? job.cities : [];
+      let cityIds = [];
+
+      // If we have states selected, fetch cities for all states and match by name
+      if (stateIds.length > 0) {
+        try {
+          setLoadingCities(true);
+          // Fetch cities for all states
+          const cityPromises = stateIds.map((stateId) =>
+            stateCityApi.getCities(stateId)
+          );
+          const responses = await Promise.all(cityPromises);
+
+          // Combine all cities from all states
+          const allCities = [];
+          const cityMap = new Map();
+
+          responses.forEach((response) => {
+            const citiesData = response?.data?.results || response?.data || [];
+            citiesData.forEach((city) => {
+              if (!cityMap.has(city._id)) {
+                cityMap.set(city._id, city);
+                allCities.push(city);
+              }
+            });
+          });
+
+          setCities(allCities);
+
+          // Match city names to IDs
+          cityIds = cityNames
+            .map((cityName) => {
+              const matchedCity = allCities.find((c) => c.name === cityName);
+              return matchedCity ? matchedCity._id : null;
+            })
+            .filter(Boolean);
+        } catch (error) {
+          console.error("Error fetching cities for edit:", error);
+          setCities([]);
+        } finally {
+          setLoadingCities(false);
+        }
+      }
+
       setNewJob({
-        job_title: job.job_title[0] || "",
+        _id: job._id,
+        job_title: Array.isArray(job.job_title)
+          ? job.job_title[0] || ""
+          : job.job_title || "",
         content: job.content || "",
-        work_place_name: job.work_place_name[0] || "On-site",
-        job_type: job.job_type[0] || "Full-time",
-        cities: job.cities[0] || "",
+        work_place_name: Array.isArray(job.work_place_name)
+          ? job.work_place_name[0] || "On-site"
+          : job.work_place_name || "On-site",
+        job_type: Array.isArray(job.job_type)
+          ? job.job_type[0] || "Full-time"
+          : job.job_type || "Full-time",
+        state: stateIds,
+        city: cityIds,
+        cities: "", // Keep for backward compatibility
         notice_period: job.notice_period || 0,
         is_immediate_joiner: job.is_immediate_joiner || false,
         media: null,
         videoStatus: job.videoStatus || "pending",
       });
+      setStatePage(1);
+      setCityPage(1);
       setSelectedJob(job);
       setCreateDialogOpen(true);
     } else {
-      showSnackbar(
-        job?.authorRole !== "employer"
-          ? "Only admin-posted jobs can be edited"
-          : "Unauthorized to edit job",
-        "error"
-      );
+      if (!isAdmin) {
+        showSnackbar("Unauthorized: Only admins can edit posts", "error");
+      } else if (job && job.authorRole !== "admin") {
+        showSnackbar("Only admin-created posts can be edited", "error");
+      } else {
+        showSnackbar("Job not found or cannot be edited", "error");
+      }
     }
   };
 
@@ -720,7 +891,8 @@ const Posts = () => {
                       >
                         View
                       </Button>
-                      {job.authorRole === "admin" && isAdmin && (
+                      {/* Only show Edit button for admin-created posts (authorRole === "employer") when user is admin */}
+                      {isAdmin && job.authorRole === "admin" && (
                         <Button
                           size="medium"
                           variant="contained"
@@ -808,12 +980,20 @@ const Posts = () => {
                           size="medium"
                           variant="contained"
                           color="primary"
-                          startIcon={<VideoIcon />}
+                          startIcon={
+                            actionLoading[job._id] ? (
+                              <CircularProgress size={18} color="inherit" />
+                            ) : (
+                              <VideoIcon />
+                            )
+                          }
                           onClick={() => handleAddVideo(job._id)}
+                          disabled={actionLoading[job._id]}
                           sx={{
                             borderRadius: 2,
                             flex: 1,
                             textTransform: "none",
+                            padding: actionLoading[job._id] ? 1 : "6px 16px",
                             "&:hover": { boxShadow: 2 },
                           }}
                           aria-label={`Add video to ${
@@ -822,7 +1002,9 @@ const Posts = () => {
                               : job.job_title
                           }`}
                         >
-                          Add Video
+                          {actionLoading[job._id]
+                            ? "Uploading..."
+                            : "Add Video"}
                         </Button>
                       </Box>
                     )}
@@ -1080,7 +1262,26 @@ const Posts = () => {
       {/* Create/Edit Job Dialog */}
       <Dialog
         open={createDialogOpen}
-        onClose={() => setCreateDialogOpen(false)}
+        onClose={() => {
+          setCreateDialogOpen(false);
+          // Reset form when dialog closes
+          setNewJob({
+            job_title: "",
+            content: "",
+            work_place_name: "On-site",
+            job_type: "Full-time",
+            cities: "",
+            state: [],
+            city: [],
+            notice_period: 0,
+            is_immediate_joiner: false,
+            media: null,
+            videoStatus: "pending",
+          });
+          setCities([]);
+          setStatePage(1);
+          setCityPage(1);
+        }}
         maxWidth="sm"
         fullWidth
         sx={{ "& .MuiDialog-paper": { borderRadius: 3 } }}
@@ -1112,14 +1313,160 @@ const Posts = () => {
               placeholder="Describe the job..."
               variant="outlined"
             />
-            <TextField
-              label="City"
-              value={newJob.cities}
-              onChange={(e) => setNewJob({ ...newJob, cities: e.target.value })}
-              fullWidth
-              required
-              variant="outlined"
-            />
+            <FormControl fullWidth variant="outlined" required>
+              <InputLabel>States</InputLabel>
+              <Select
+                multiple
+                value={newJob.state}
+                label="States"
+                onChange={(e) => {
+                  const value =
+                    typeof e.target.value === "string"
+                      ? e.target.value.split(",")
+                      : e.target.value;
+                  setNewJob({ ...newJob, state: value, city: [] });
+                  setCityPage(1); // Reset city page when states change
+                }}
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) {
+                    return <em>Select states</em>;
+                  }
+                  return selected
+                    .map(
+                      (stateId) => states.find((s) => s._id === stateId)?.name
+                    )
+                    .filter(Boolean)
+                    .join(", ");
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    style: {
+                      maxHeight: 300,
+                    },
+                    onScroll: (e) => {
+                      const { scrollTop, scrollHeight, clientHeight } =
+                        e.target;
+                      // Load more when user scrolls near the bottom (within 50px)
+                      if (
+                        scrollHeight - scrollTop <= clientHeight + 50 &&
+                        states.length > statePage * itemsPerPage
+                      ) {
+                        // Small delay to prevent rapid firing
+                        setTimeout(() => {
+                          setStatePage((prev) => prev + 1);
+                        }, 300);
+                      }
+                    },
+                  },
+                }}
+              >
+                {states.slice(0, statePage * itemsPerPage).map((state) => (
+                  <MenuItem key={state._id} value={state._id}>
+                    <Checkbox checked={newJob.state.includes(state._id)} />
+                    <ListItemText primary={state.name} />
+                  </MenuItem>
+                ))}
+                {states.length > statePage * itemsPerPage && (
+                  <MenuItem disabled>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        width: "100%",
+                        py: 1,
+                      }}
+                    >
+                      <CircularProgress size={20} />
+                      <Typography variant="body2" sx={{ ml: 1 }}>
+                        Loading more...
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                )}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth variant="outlined" required>
+              <InputLabel>City</InputLabel>
+              <Select
+                multiple
+                value={newJob.city}
+                label="City"
+                onChange={(e) => {
+                  const value =
+                    typeof e.target.value === "string"
+                      ? e.target.value.split(",")
+                      : e.target.value;
+                  setNewJob({ ...newJob, city: value });
+                }}
+                disabled={
+                  !newJob.state || newJob.state.length === 0 || loadingCities
+                }
+                renderValue={(selected) => {
+                  if (!selected || selected.length === 0) {
+                    return <em>Select cities</em>;
+                  }
+                  return selected
+                    .map((cityId) => cities.find((c) => c._id === cityId)?.name)
+                    .filter(Boolean)
+                    .join(", ");
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    style: {
+                      maxHeight: 300,
+                    },
+                    onScroll: (e) => {
+                      const { scrollTop, scrollHeight, clientHeight } =
+                        e.target;
+                      // Load more when user scrolls near the bottom (within 50px)
+                      if (
+                        scrollHeight - scrollTop <= clientHeight + 50 &&
+                        cities.length > cityPage * itemsPerPage
+                      ) {
+                        // Small delay to prevent rapid firing
+                        setTimeout(() => {
+                          setCityPage((prev) => prev + 1);
+                        }, 300);
+                      }
+                    },
+                  },
+                }}
+              >
+                {cities.slice(0, cityPage * itemsPerPage).map((city) => (
+                  <MenuItem key={city._id} value={city._id}>
+                    <Checkbox checked={newJob.city.includes(city._id)} />
+                    <ListItemText primary={city.name} />
+                  </MenuItem>
+                ))}
+                {cities.length > cityPage * itemsPerPage && (
+                  <MenuItem disabled>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        width: "100%",
+                        py: 1,
+                      }}
+                    >
+                      <CircularProgress size={20} />
+                      <Typography variant="body2" sx={{ ml: 1 }}>
+                        Loading more...
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                )}
+              </Select>
+              {loadingCities && (
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 1 }}>
+                  <CircularProgress size={20} />
+                  <Typography variant="body2" sx={{ ml: 1 }}>
+                    Loading cities...
+                  </Typography>
+                </Box>
+              )}
+            </FormControl>
             <FormControl fullWidth variant="outlined">
               <InputLabel>Workplace</InputLabel>
               <Select
@@ -1212,7 +1559,12 @@ const Posts = () => {
           <Button
             onClick={handleCreateJob}
             variant="contained"
-            disabled={!newJob.job_title || !newJob.cities}
+            disabled={
+              !newJob.job_title ||
+              !newJob.state ||
+              newJob.state.length === 0 ||
+              newJob.city.length === 0
+            }
             sx={{ borderRadius: 2 }}
             aria-label={newJob._id ? "Update job" : "Create job"}
           >
